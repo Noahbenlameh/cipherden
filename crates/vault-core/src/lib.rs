@@ -1,4 +1,4 @@
-//! vault-core: encrypted storage core for SecureVault.
+//! vault-core: encrypted storage core for CIPHERDEN.
 //!
 //! This crate has no UI dependencies and is responsible for exactly one
 //! thing: turning a master password plus a directory on disk into a durable,
@@ -9,12 +9,17 @@
 //! and SQLCipher (via `rusqlite`'s `bundled-sqlcipher` feature) for
 //! authenticated AES-256 encryption at rest.
 
+mod container;
 pub mod error;
+pub mod export;
+pub mod files;
+pub mod import;
 pub mod kdf;
 pub mod meta;
 pub mod store;
 
 pub use error::{Result, VaultError};
+pub use files::FileVault;
 pub use kdf::Argon2Params;
 pub use store::{Entry, NewEntry, Vault};
 

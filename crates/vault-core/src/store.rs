@@ -3,9 +3,10 @@ use std::path::{Path, PathBuf};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
+use crate::container;
 use crate::error::{Result, VaultError};
-use crate::kdf::{derive_key, random_salt, Argon2Params, VaultKey};
-use crate::meta::{meta_path_for, VaultMeta};
+use crate::kdf::{Argon2Params, VaultKey};
+use crate::meta::meta_path_for;
 use crate::now_rfc3339;
 
 const SCHEMA: &str = "
@@ -72,23 +73,7 @@ impl Vault {
         params: Argon2Params,
     ) -> Result<Self> {
         let db_path = db_path.as_ref().to_path_buf();
-        if db_path.exists() {
-            return Err(VaultError::AlreadyExists(db_path));
-        }
-        if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        let salt = random_salt();
-        let key = derive_key(master_password.as_bytes(), &salt, params)?;
-
-        let meta = VaultMeta::new(&salt, params);
-        meta.save(&meta_path_for(&db_path))?;
-
-        let conn = Connection::open(&db_path)?;
-        set_key(&conn, &key)?;
-        conn.execute_batch(SCHEMA)?;
-
+        let (conn, key) = container::create(&db_path, master_password, params, SCHEMA)?;
         Ok(Self { conn, db_path, key })
     }
 
@@ -97,31 +82,7 @@ impl Vault {
     /// corrupted, which is the correct behavior for an authenticated cipher).
     pub fn open(db_path: impl AsRef<Path>, master_password: &str) -> Result<Self> {
         let db_path = db_path.as_ref().to_path_buf();
-        if !db_path.exists() {
-            return Err(VaultError::NotFound(db_path));
-        }
-        let meta_path = meta_path_for(&db_path);
-        if !meta_path.exists() {
-            return Err(VaultError::InvalidMeta(format!(
-                "missing metadata file: {}",
-                meta_path.display()
-            )));
-        }
-        let meta = VaultMeta::load(&meta_path)?;
-        let salt = meta.salt_bytes()?;
-        let key = derive_key(master_password.as_bytes(), &salt, meta.argon2)?;
-
-        let conn = Connection::open(&db_path)?;
-        set_key(&conn, &key)?;
-
-        // SQLCipher only reveals a wrong key when it actually tries to parse
-        // a page. Reading sqlite_master forces that and gives us a clean
-        // single point to translate into "wrong password".
-        conn.query_row("SELECT count(*) FROM sqlite_master", [], |row| {
-            row.get::<_, i64>(0)
-        })
-        .map_err(|_| VaultError::InvalidPassword)?;
-
+        let (conn, key) = container::open(&db_path, master_password, SCHEMA)?;
         Ok(Self { conn, db_path, key })
     }
 
@@ -259,22 +220,4 @@ fn row_to_entry(row: &rusqlite::Row) -> rusqlite::Result<Entry> {
         created_at: row.get(7)?,
         updated_at: row.get(8)?,
     })
-}
-
-fn set_key(conn: &Connection, key: &VaultKey) -> Result<()> {
-    let hex_key = to_hex(key.as_bytes());
-    // Raw key form (x'...') hands SQLCipher our already-derived Argon2id key
-    // directly, so SQLCipher does not additionally run its own (weaker,
-    // PBKDF2-based) passphrase KDF on top.
-    conn.execute_batch(&format!("PRAGMA key = \"x'{hex_key}'\";"))?;
-    Ok(())
-}
-
-fn to_hex(bytes: &[u8]) -> String {
-    use std::fmt::Write;
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        write!(s, "{b:02x}").expect("writing to a String cannot fail");
-    }
-    s
 }

@@ -1,9 +1,9 @@
 [package]
-name = "securevault"
+name = "cipherden"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "SecureVault desktop shell: Tauri backend wiring vault-core to a local dashboard UI."
+description = "CIPHERDEN desktop shell: Tauri backend wiring vault-core to a local dashboard UI."
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -15,3 +15,4 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 arboard = "3"
 rand = "0.8"
+tauri-plugin-dialog = "2"

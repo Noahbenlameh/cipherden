@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "SecureVault",
+  "productName": "CIPHERDEN",
   "version": "0.1.0",
-  "identifier": "dev.securevault.app",
+  "identifier": "dev.cipherden.app",
   "build": {
     "frontendDist": "../dist"
   },
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "SecureVault",
+        "title": "CIPHERDEN",
         "width": 1100,
         "height": 720,
         "minWidth": 700,

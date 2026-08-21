@@ -6,6 +6,10 @@ src-tauri/gen/
 *.db
 *.db-wal
 *.db-shm
+*.vault
+*.vault-wal
+*.vault-shm
 *.meta.json
+/vault/
 .DS_Store
 .claude/

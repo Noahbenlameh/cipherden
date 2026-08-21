@@ -1,6 +1,6 @@
 # Threat Model
 
-SecureVault stores passwords and other sensitive records, encrypted at rest,
+CIPHERDEN stores passwords and other sensitive records, encrypted at rest,
 on a removable drive (SSD/USB). This document states plainly what that
 protects against and what it does not, so users can make an informed
 decision about how to rely on it.
@@ -47,5 +47,5 @@ decision about how to rely on it.
   is **not secret**. It holds only the KDF salt and Argon2id parameters,
   which by design do not need to be hidden — only the master password does.
 - All cryptographic primitives are provided by external, audited libraries
-  (RustCrypto `argon2`, SQLCipher). SecureVault does not implement its own
+  (RustCrypto `argon2`, SQLCipher). CIPHERDEN does not implement its own
   encryption, key derivation, or random number generation.

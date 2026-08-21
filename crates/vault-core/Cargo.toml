@@ -3,11 +3,13 @@ name = "vault-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Encrypted storage core for SecureVault: Argon2id KDF + SQLCipher-backed entry store. No UI dependencies."
+description = "Encrypted storage core for CIPHERDEN: Argon2id KDF + SQLCipher-backed entry store. No UI dependencies."
 
 [dependencies]
 argon2 = "0.5"
 base64 = "0.22"
+csv = "1"
+keepass = "0.13"
 rusqlite = { version = "0.31", features = ["bundled-sqlcipher-vendored-openssl"] }
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
@@ -18,3 +20,6 @@ time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
 
 [dev-dependencies]
 tempfile = "3"
+# Only tests need to *write* a .kdbx fixture; production code only ever
+# reads them, so this feature is deliberately not enabled in [dependencies].
+keepass = { version = "0.13", features = ["save_kdbx4"] }

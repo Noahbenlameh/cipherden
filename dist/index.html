@@ -2,74 +2,161 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8" />
-<title>SecureVault</title>
+<title>CIPHERDEN</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
 <section id="lock-screen" class="screen">
-  <div class="lock-card">
-    <h1>SecureVault</h1>
-    <p class="hint">Путь к файлу хранилища (например: <code>./vault/vault.db</code>)</p>
-    <input id="vault-path" type="text" placeholder="./vault/vault.db" value="./vault/vault.db" />
-    <input id="master-password" type="password" placeholder="Мастер-пароль" />
+  <div class="lock-card panel">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+
+    <div class="brand">
+      <div class="brand-mark">◈</div>
+      <h1 class="brand-title">CIPHERDEN</h1>
+      <p class="brand-tag">PORTABLE // OFFLINE // ENCRYPTED</p>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="vault-path">Путь к хранилищу</label>
+      <input id="vault-path" type="text" placeholder="./vault/vault.db" value="./vault/vault.db" />
+    </div>
+    <div class="field">
+      <label class="field-label" for="master-password">Мастер-пароль</label>
+      <input id="master-password" type="password" placeholder="••••••••" />
+    </div>
+
     <div class="row">
-      <button id="btn-open">Открыть хранилище</button>
-      <button id="btn-create" class="secondary">Создать новое</button>
+      <button id="btn-open">Открыть</button>
+      <button id="btn-create" class="ghost">Создать новое</button>
     </div>
     <p id="lock-error" class="error"></p>
-    <p class="warn">При создании нового хранилища сделайте минимум 2 резервные копии на разных носителях (правило 3-2-1) — см. кнопку «Резервная копия» после открытия.</p>
+    <p class="warn">При создании нового хранилища сделайте минимум 2 резервные копии на разных носителях (правило 3-2-1) — кнопка «Бэкап» доступна после открытия.</p>
   </div>
 </section>
 
 <section id="dashboard" class="screen hidden">
-  <header>
-    <h1>SecureVault</h1>
-    <input id="search" type="text" placeholder="Поиск по названию, логину, URL, категории..." />
-    <button id="btn-lock">Заблокировать</button>
+  <header class="hud-bar">
+    <div class="hud-brand"><span class="brand-mark small">◈</span> CIPHERDEN</div>
+    <input id="search" type="text" placeholder="ПОИСК: название · логин · URL · категория" />
+    <div class="hud-status">
+      <span class="dot"></span>
+      <span id="entry-count">0 записей</span>
+      <span class="hud-sep">|</span>
+      <span id="session-timer">05:00</span>
+    </div>
+    <button id="btn-lock" class="ghost small">Заблокировать</button>
   </header>
 
-  <div class="toolbar">
-    <button id="btn-add">+ Новая запись</button>
-    <button id="btn-backup">Резервная копия</button>
-    <span id="status"></span>
+  <div class="zone-tabs">
+    <button class="zone-tab active" data-zone="accounts">🔑 АККАУНТЫ</button>
+    <button class="zone-tab" data-zone="files">🗂 ФАЙЛЫ</button>
   </div>
 
-  <table id="entries-table">
-    <thead>
-      <tr>
-        <th>Название</th>
-        <th>Логин</th>
-        <th>URL</th>
-        <th>Категория</th>
-        <th>Обновлено</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody id="entries-body"></tbody>
-  </table>
+  <div id="zone-accounts" class="zone-panel">
+    <div class="toolbar">
+      <button id="btn-add">+ Новая запись</button>
+      <button id="btn-backup" class="ghost">⇩ Бэкап</button>
+      <button id="btn-import-csv" class="ghost">⇧ Импорт CSV</button>
+      <button id="btn-import-kdbx" class="ghost">⇧ Импорт KeePass</button>
+      <button id="btn-export-selected" class="ghost">⇩ Экспорт выбранного</button>
+      <select id="category-filter">
+        <option value="">Все категории</option>
+      </select>
+      <span id="status"></span>
+    </div>
+
+    <div class="table-panel panel">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <table id="entries-table">
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" id="select-all" /></th>
+            <th>Название</th>
+            <th>Логин</th>
+            <th>URL</th>
+            <th>Категория</th>
+            <th>Обновлено</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="entries-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="zone-files" class="zone-panel hidden">
+    <div id="files-lock" class="files-lock-inline panel">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <p class="hint">Файловое хранилище — отдельная зашифрованная зона, со своим паролем (может отличаться от пароля аккаунтов).</p>
+      <div class="field">
+        <label class="field-label" for="files-path">Путь к хранилищу файлов</label>
+        <input id="files-path" type="text" placeholder="./vault/files.vault" value="./vault/files.vault" />
+      </div>
+      <div class="field">
+        <label class="field-label" for="files-password">Пароль</label>
+        <input id="files-password" type="password" placeholder="••••••••" />
+      </div>
+      <div class="row">
+        <button id="btn-files-open">Открыть</button>
+        <button id="btn-files-create" class="ghost">Создать новое</button>
+      </div>
+      <p id="files-lock-error" class="error"></p>
+    </div>
+
+    <div id="files-content" class="hidden">
+      <div class="toolbar">
+        <button id="btn-file-add">+ Добавить файлы</button>
+        <button id="btn-files-backup" class="ghost">⇩ Бэкап</button>
+        <button id="btn-files-lock" class="ghost small">Заблокировать</button>
+        <span id="files-status"></span>
+      </div>
+      <div class="table-panel panel">
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+        <table id="files-table">
+          <thead>
+            <tr>
+              <th>Имя</th>
+              <th>Размер</th>
+              <th>Обновлено</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="files-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </section>
 
 <div id="entry-modal" class="modal hidden">
-  <div class="modal-card">
+  <div class="modal-card panel">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+
     <h2 id="entry-modal-title">Новая запись</h2>
     <input type="hidden" id="entry-id" />
-    <label>Название<input id="f-title" type="text" /></label>
-    <label>Логин<input id="f-username" type="text" /></label>
-    <label>Пароль
+    <div class="field"><label class="field-label">Название</label><input id="f-title" type="text" /></div>
+    <div class="field"><label class="field-label">Логин</label><input id="f-username" type="text" /></div>
+    <div class="field">
+      <label class="field-label">Пароль</label>
       <div class="row">
-        <input id="f-password" type="text" />
-        <button id="btn-generate" type="button">Сгенерировать</button>
-        <button id="btn-copy-password" type="button">Копировать</button>
+        <input id="f-password" type="text" class="mono" />
+        <button id="btn-generate" type="button" class="ghost small">⟳</button>
+        <button id="btn-copy-password" type="button" class="ghost small">⧉</button>
       </div>
-    </label>
-    <label>URL<input id="f-url" type="text" /></label>
-    <label>Категория<input id="f-category" type="text" /></label>
-    <label>Заметка<textarea id="f-notes"></textarea></label>
-    <div class="row">
+    </div>
+    <div class="field"><label class="field-label">URL</label><input id="f-url" type="text" /></div>
+    <div class="field"><label class="field-label">Категория</label><input id="f-category" type="text" /></div>
+    <div class="field"><label class="field-label">Заметка</label><textarea id="f-notes"></textarea></div>
+    <div class="row modal-actions">
       <button id="btn-save-entry">Сохранить</button>
       <button id="btn-delete-entry" class="danger hidden">Удалить</button>
-      <button id="btn-cancel-entry" class="secondary">Отмена</button>
+      <button id="btn-cancel-entry" class="ghost">Отмена</button>
     </div>
   </div>
 </div>
