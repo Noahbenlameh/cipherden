@@ -1,6 +1,68 @@
 const invoke = window.__TAURI__.core.invoke;
 const dialog = window.__TAURI__.dialog;
 
+// Tauri's macOS webview does not implement the native window.prompt()
+// dialog (it silently returns null without ever showing anything), so we
+// can't rely on window.prompt/confirm anywhere in this app. These two
+// helpers are our own in-app replacements, styled to match the rest of
+// the UI.
+function showPromptModal(title, { password = false, placeholder = "" } = {}) {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById("prompt-modal");
+    const titleEl = document.getElementById("prompt-modal-title");
+    const inputEl = document.getElementById("prompt-modal-input");
+    const okBtn = document.getElementById("prompt-modal-ok");
+    const cancelBtn = document.getElementById("prompt-modal-cancel");
+
+    titleEl.textContent = title;
+    inputEl.type = password ? "password" : "text";
+    inputEl.placeholder = placeholder;
+    inputEl.value = "";
+    modalEl.classList.remove("hidden");
+    setTimeout(() => inputEl.focus(), 0);
+
+    function cleanup(result) {
+      modalEl.classList.add("hidden");
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      inputEl.removeEventListener("keydown", onKeydown);
+      resolve(result);
+    }
+    function onOk() { cleanup(inputEl.value.trim() || null); }
+    function onCancel() { cleanup(null); }
+    function onKeydown(e) {
+      if (e.key === "Enter") onOk();
+      if (e.key === "Escape") onCancel();
+    }
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    inputEl.addEventListener("keydown", onKeydown);
+  });
+}
+
+function showConfirmModal(message) {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById("confirm-modal");
+    const messageEl = document.getElementById("confirm-modal-message");
+    const okBtn = document.getElementById("confirm-modal-ok");
+    const cancelBtn = document.getElementById("confirm-modal-cancel");
+
+    messageEl.textContent = message;
+    modalEl.classList.remove("hidden");
+
+    function cleanup(result) {
+      modalEl.classList.add("hidden");
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      resolve(result);
+    }
+    function onOk() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+  });
+}
+
 const lockScreen = document.getElementById("lock-screen");
 const dashboard = document.getElementById("dashboard");
 const lockError = document.getElementById("lock-error");
@@ -303,7 +365,7 @@ document.getElementById("btn-import-kdbx").addEventListener("click", async () =>
     filters: [{ name: "KeePass", extensions: ["kdbx"] }],
   });
   if (!path) return;
-  const kdbxPassword = window.prompt("Пароль от этой базы KeePass (не ваш мастер-пароль CIPHERDEN):");
+  const kdbxPassword = await showPromptModal("Пароль от базы KeePass (не ваш мастер-пароль CIPHERDEN)", { password: true });
   if (kdbxPassword == null) return;
   try {
     const count = await invoke("import_kdbx", { path, kdbxPassword });
@@ -335,13 +397,26 @@ document.querySelectorAll(".zone-tab").forEach((tab) => {
   });
 });
 
-// --- Files zone -----------------------------------------------------------
+// --- Files zone: folders, icon-grid "desktop", drag-and-drop --------------
 
 const filesLock = document.getElementById("files-lock");
 const filesContent = document.getElementById("files-content");
 const filesLockError = document.getElementById("files-lock-error");
-const filesBody = document.getElementById("files-body");
+const filesGrid = document.getElementById("files-grid");
+const filesBreadcrumb = document.getElementById("files-breadcrumb");
 const filesStatus = document.getElementById("files-status");
+
+// path = the chain of folders from root to the current folder (root itself
+// is not in this array). Empty path = at the root.
+let filesPath = [];
+
+function currentFolderId() {
+  return filesPath.length ? filesPath[filesPath.length - 1].id : null;
+}
+
+function parentFolderId() {
+  return filesPath.length >= 2 ? filesPath[filesPath.length - 2].id : null;
+}
 
 function setFilesStatus(text) {
   filesStatus.textContent = text;
@@ -351,6 +426,7 @@ function setFilesStatus(text) {
 function showFilesUnlocked() {
   filesLock.classList.add("hidden");
   filesContent.classList.remove("hidden");
+  filesPath = [];
   refreshFiles();
 }
 
@@ -374,51 +450,270 @@ function humanSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
+function fileGlyph(name) {
+  const ext = (name.split(".").pop() || "").toLowerCase();
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext)) return "🖼";
+  if (["pdf", "doc", "docx", "txt", "md", "rtf"].includes(ext)) return "📄";
+  if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return "🗜";
+  if (["mp3", "wav", "flac", "ogg"].includes(ext)) return "🎵";
+  if (["mp4", "mov", "avi", "mkv"].includes(ext)) return "🎞";
+  return "📦";
+}
+
+function renderBreadcrumb() {
+  const parts = [`<span class="crumb${filesPath.length === 0 ? " current" : ""}" data-index="-1">⌂ Корень</span>`];
+  filesPath.forEach((f, i) => {
+    const isLast = i === filesPath.length - 1;
+    parts.push('<span class="sep">/</span>');
+    parts.push(`<span class="crumb${isLast ? " current" : ""}" data-index="${i}">${escapeHtml(f.name)}</span>`);
+  });
+  filesBreadcrumb.innerHTML = parts.join("");
+  filesBreadcrumb.querySelectorAll(".crumb[data-index]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const idx = parseInt(el.dataset.index, 10);
+      if (idx === filesPath.length - 1) return;
+      filesPath = idx < 0 ? [] : filesPath.slice(0, idx + 1);
+      refreshFiles();
+    });
+  });
+}
+
 async function refreshFiles() {
   try {
-    const files = await invoke("list_files");
-    filesBody.innerHTML = "";
-    for (const f of files) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${escapeHtml(f.name)}</td>
-        <td class="mono">${humanSize(f.size)}</td>
-        <td>${escapeHtml((f.updated_at || "").slice(0, 16).replace("T", " "))}</td>
-        <td>
-          <button data-id="${f.id}" class="ghost small file-extract">⇩ Извлечь</button>
-          <button data-id="${f.id}" class="danger small file-delete">Удалить</button>
-        </td>
-      `;
-      filesBody.appendChild(tr);
-    }
-    document.querySelectorAll(".file-extract").forEach((btn) => {
-      btn.addEventListener("click", () => extractFile(parseInt(btn.dataset.id, 10), files));
-    });
-    document.querySelectorAll(".file-delete").forEach((btn) => {
-      btn.addEventListener("click", () => deleteFile(parseInt(btn.dataset.id, 10)));
-    });
+    const folderId = currentFolderId();
+    const [folders, files] = await Promise.all([
+      invoke("list_folders", { parentId: folderId }),
+      invoke("list_files", { folderId }),
+    ]);
+    renderBreadcrumb();
+    renderFilesGrid(folders, files);
   } catch (e) {
     showFilesLocked("Хранилище файлов заблокировано по таймауту, введите пароль снова.");
   }
 }
 
-async function extractFile(id, files) {
-  const file = files.find((f) => f.id === id);
-  const destPath = await dialog.save({ title: "Куда сохранить файл", defaultPath: file?.name });
+function renderFilesGrid(folders, files) {
+  filesGrid.innerHTML = "";
+
+  if (filesPath.length > 0) {
+    filesGrid.appendChild(makeUpTile());
+  }
+  for (const f of folders) filesGrid.appendChild(makeFolderTile(f));
+  for (const f of files) filesGrid.appendChild(makeFileTile(f));
+
+  if (folders.length === 0 && files.length === 0 && filesPath.length === 0) {
+    const hint = document.createElement("div");
+    hint.className = "files-empty-hint";
+    hint.textContent = "Пусто. Перетащите файлы сюда через «+ Добавить файлы» или создайте папку.";
+    filesGrid.appendChild(hint);
+  }
+}
+
+function makeUpTile() {
+  const el = document.createElement("div");
+  el.className = "file-icon";
+  el.innerHTML = `<span class="glyph">⬆</span><span class="label">..</span>`;
+  el.addEventListener("dblclick", () => {
+    filesPath.pop();
+    refreshFiles();
+  });
+  setDropTarget(el, async (dragged) => {
+    const targetParent = parentFolderId();
+    if (dragged.type === "file") await invoke("move_file", { id: dragged.id, folderId: targetParent });
+    else await invoke("move_folder", { id: dragged.id, newParentId: targetParent });
+  });
+  return el;
+}
+
+function makeFolderTile(folder) {
+  const el = document.createElement("div");
+  el.className = "file-icon";
+  el.draggable = true;
+  el.innerHTML = `
+    ${folder.pinned ? '<span class="pin-badge">📌</span>' : ""}
+    <span class="glyph">📁</span>
+    <span class="label">${escapeHtml(folder.name)}</span>
+    <div class="icon-actions">
+      <button type="button" class="ghost pin-toggle" title="Закрепить">📌</button>
+      <button type="button" class="danger delete-btn" title="Удалить">✕</button>
+    </div>
+  `;
+  el.addEventListener("dblclick", () => {
+    filesPath.push({ id: folder.id, name: folder.name });
+    refreshFiles();
+  });
+  el.querySelector(".pin-toggle").addEventListener("click", async (e) => {
+    e.stopPropagation();
+    await invoke("set_folder_pinned", { id: folder.id, pinned: !folder.pinned });
+    refreshFiles();
+  });
+  el.querySelector(".delete-btn").addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!(await showConfirmModal(`Удалить папку «${folder.name}»? Она должна быть пустой.`))) return;
+    try {
+      await invoke("delete_folder", { id: folder.id });
+      refreshFiles();
+    } catch (err) {
+      setFilesStatus("Ошибка: " + err);
+    }
+  });
+
+  setDragSource(el, { type: "folder", id: folder.id });
+  setDropTarget(el, async (dragged) => {
+    if (dragged.type === "folder" && dragged.id === folder.id) return;
+    try {
+      if (dragged.type === "file") await invoke("move_file", { id: dragged.id, folderId: folder.id });
+      else await invoke("move_folder", { id: dragged.id, newParentId: folder.id });
+    } catch (err) {
+      setFilesStatus("Ошибка перемещения: " + err);
+    }
+  });
+  return el;
+}
+
+function makeFileTile(file) {
+  const el = document.createElement("div");
+  el.className = "file-icon";
+  el.draggable = true;
+  el.innerHTML = `
+    ${file.pinned ? '<span class="pin-badge">📌</span>' : ""}
+    <span class="glyph">${fileGlyph(file.name)}</span>
+    <span class="label">${escapeHtml(file.name)}</span>
+    <div class="icon-actions">
+      <button type="button" class="ghost pin-toggle" title="Закрепить">📌</button>
+      <button type="button" class="ghost extract-btn" title="Извлечь">⇩</button>
+      <button type="button" class="danger delete-btn" title="Удалить">✕</button>
+    </div>
+  `;
+  el.title = `${file.name} — ${humanSize(file.size)}`;
+  el.addEventListener("dblclick", () => openPreview(file));
+  el.querySelector(".pin-toggle").addEventListener("click", async (e) => {
+    e.stopPropagation();
+    await invoke("set_file_pinned", { id: file.id, pinned: !file.pinned });
+    refreshFiles();
+  });
+  el.querySelector(".extract-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    extractFile(file);
+  });
+  el.querySelector(".delete-btn").addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!(await showConfirmModal(`Удалить файл «${file.name}»?`))) return;
+    await invoke("delete_file", { id: file.id });
+    refreshFiles();
+  });
+
+  setDragSource(el, { type: "file", id: file.id });
+  return el;
+}
+
+function setDragSource(el, payload) {
+  el.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("application/json", JSON.stringify(payload));
+    e.dataTransfer.effectAllowed = "move";
+    setTimeout(() => el.classList.add("dragging"), 0);
+  });
+  el.addEventListener("dragend", () => el.classList.remove("dragging"));
+}
+
+function setDropTarget(el, onDrop) {
+  el.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    el.classList.add("drag-over");
+  });
+  el.addEventListener("dragleave", () => el.classList.remove("drag-over"));
+  el.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    el.classList.remove("drag-over");
+    const raw = e.dataTransfer.getData("application/json");
+    if (!raw) return;
+    const dragged = JSON.parse(raw);
+    await onDrop(dragged);
+    refreshFiles();
+  });
+}
+
+async function extractFile(file) {
+  const destPath = await dialog.save({ title: "Куда сохранить файл", defaultPath: file.name });
   if (!destPath) return;
   try {
-    await invoke("extract_file", { id, destPath });
+    await invoke("extract_file", { id: file.id, destPath });
     setFilesStatus("Файл сохранён: " + destPath);
   } catch (e) {
     setFilesStatus("Ошибка: " + e);
   }
 }
 
-async function deleteFile(id) {
-  if (!window.confirm("Удалить этот файл из хранилища?")) return;
-  await invoke("delete_file", { id });
-  refreshFiles();
+// --- In-app preview: view a file's contents without ever writing a
+// decrypted copy to the host disk. Bytes come back base64-encoded over IPC
+// and are turned into a blob: URL entirely in memory.
+
+let currentPreviewObjectUrl = null;
+
+function base64ToBytes(b64) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
+
+function closePreview() {
+  document.getElementById("preview-modal").classList.add("hidden");
+  if (currentPreviewObjectUrl) {
+    URL.revokeObjectURL(currentPreviewObjectUrl);
+    currentPreviewObjectUrl = null;
+  }
+  document.getElementById("preview-body").innerHTML = "";
+}
+
+async function openPreview(file) {
+  document.getElementById("preview-title").textContent = file.name;
+  document.getElementById("preview-body").innerHTML = '<p class="hint">Загрузка...</p>';
+  document.getElementById("preview-modal").classList.remove("hidden");
+  document.getElementById("preview-extract").onclick = () => extractFile(file);
+
+  let preview;
+  try {
+    preview = await invoke("read_file_preview", { id: file.id });
+  } catch (e) {
+    document.getElementById("preview-body").innerHTML = `<p class="error">Ошибка: ${escapeHtml(String(e))}</p>`;
+    return;
+  }
+
+  const bytes = base64ToBytes(preview.data_base64);
+  const blob = new Blob([bytes], { type: preview.mime });
+  currentPreviewObjectUrl = URL.createObjectURL(blob);
+
+  const body = document.getElementById("preview-body");
+  if (preview.mime.startsWith("image/")) {
+    body.innerHTML = `<img src="${currentPreviewObjectUrl}" class="preview-image" alt="${escapeHtml(file.name)}" />`;
+  } else if (preview.mime === "application/pdf") {
+    body.innerHTML = `<iframe src="${currentPreviewObjectUrl}" class="preview-frame" title="${escapeHtml(file.name)}"></iframe>`;
+  } else if (preview.mime.startsWith("text/") || preview.mime === "application/json") {
+    const text = new TextDecoder("utf-8").decode(bytes);
+    body.innerHTML = '<pre class="preview-text"></pre>';
+    body.querySelector("pre").textContent = text;
+  } else if (preview.mime.startsWith("audio/")) {
+    body.innerHTML = `<audio controls src="${currentPreviewObjectUrl}" class="preview-media"></audio>`;
+  } else if (preview.mime.startsWith("video/")) {
+    body.innerHTML = `<video controls src="${currentPreviewObjectUrl}" class="preview-media"></video>`;
+  } else {
+    body.innerHTML = `<p class="hint">Предпросмотр недоступен для этого типа файла. Нажмите «⇩ Извлечь», чтобы сохранить его на диск и открыть обычной программой.</p>`;
+  }
+}
+
+document.getElementById("preview-close").addEventListener("click", closePreview);
+
+document.getElementById("btn-folder-add").addEventListener("click", async () => {
+  const name = await showPromptModal("Название новой папки", { placeholder: "Например: Документы" });
+  if (!name) return;
+  try {
+    await invoke("create_folder", { parentId: currentFolderId(), name });
+    refreshFiles();
+  } catch (e) {
+    setFilesStatus("Ошибка: " + e);
+  }
+});
 
 document.getElementById("btn-files-open").addEventListener("click", async () => {
   const path = document.getElementById("files-path").value.trim();
@@ -456,7 +751,7 @@ document.getElementById("btn-file-add").addEventListener("click", async () => {
   if (!paths) return;
   const list = Array.isArray(paths) ? paths : [paths];
   try {
-    const added = await invoke("add_files", { paths: list });
+    const added = await invoke("add_files", { folderId: currentFolderId(), paths: list });
     setFilesStatus(`Добавлено файлов: ${added}`);
     refreshFiles();
   } catch (e) {

@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use rand::Rng;
 use serde::Serialize;
 use tauri::State;
-use vault_core::files::FileMeta;
+use vault_core::files::{FileMeta, Folder};
 use vault_core::store::{Entry, NewEntry};
 use vault_core::{import, Argon2Params, FileVault, Vault};
 
@@ -275,18 +275,101 @@ fn is_file_vault_unlocked(state: State<'_, FilesState>) -> Result<bool, String> 
 }
 
 #[tauri::command]
-fn list_files(state: State<'_, FilesState>) -> Result<Vec<FileMeta>, String> {
+fn list_files(
+    state: State<'_, FilesState>,
+    folder_id: Option<i64>,
+) -> Result<Vec<FileMeta>, String> {
     let mut guard = state.lock().map_err(to_err)?;
     guard.touch();
     let vault = guard.open.as_ref().ok_or("file vault is locked")?;
-    vault.list_files().map_err(to_err)
+    vault.list_files(folder_id).map_err(to_err)
+}
+
+#[tauri::command]
+fn list_folders(
+    state: State<'_, FilesState>,
+    parent_id: Option<i64>,
+) -> Result<Vec<Folder>, String> {
+    let mut guard = state.lock().map_err(to_err)?;
+    guard.touch();
+    let vault = guard.open.as_ref().ok_or("file vault is locked")?;
+    vault.list_folders(parent_id).map_err(to_err)
+}
+
+#[tauri::command]
+fn create_folder(
+    state: State<'_, FilesState>,
+    parent_id: Option<i64>,
+    name: String,
+) -> Result<i64, String> {
+    let mut guard = state.lock().map_err(to_err)?;
+    guard.touch();
+    let vault = guard.open.as_ref().ok_or("file vault is locked")?;
+    vault.create_folder(parent_id, &name).map_err(to_err)
+}
+
+#[tauri::command]
+fn rename_folder(state: State<'_, FilesState>, id: i64, new_name: String) -> Result<(), String> {
+    let mut guard = state.lock().map_err(to_err)?;
+    guard.touch();
+    let vault = guard.open.as_ref().ok_or("file vault is locked")?;
+    vault.rename_folder(id, &new_name).map_err(to_err)
+}
+
+#[tauri::command]
+fn delete_folder(state: State<'_, FilesState>, id: i64) -> Result<(), String> {
+    let mut guard = state.lock().map_err(to_err)?;
+    guard.touch();
+    let vault = guard.open.as_ref().ok_or("file vault is locked")?;
+    vault.delete_folder(id).map_err(to_err)
+}
+
+#[tauri::command]
+fn move_folder(
+    state: State<'_, FilesState>,
+    id: i64,
+    new_parent_id: Option<i64>,
+) -> Result<(), String> {
+    let mut guard = state.lock().map_err(to_err)?;
+    guard.touch();
+    let vault = guard.open.as_ref().ok_or("file vault is locked")?;
+    vault.move_folder(id, new_parent_id).map_err(to_err)
+}
+
+#[tauri::command]
+fn set_folder_pinned(state: State<'_, FilesState>, id: i64, pinned: bool) -> Result<(), String> {
+    let mut guard = state.lock().map_err(to_err)?;
+    guard.touch();
+    let vault = guard.open.as_ref().ok_or("file vault is locked")?;
+    vault.set_folder_pinned(id, pinned).map_err(to_err)
+}
+
+#[tauri::command]
+fn move_file(state: State<'_, FilesState>, id: i64, folder_id: Option<i64>) -> Result<(), String> {
+    let mut guard = state.lock().map_err(to_err)?;
+    guard.touch();
+    let vault = guard.open.as_ref().ok_or("file vault is locked")?;
+    vault.move_file(id, folder_id).map_err(to_err)
+}
+
+#[tauri::command]
+fn set_file_pinned(state: State<'_, FilesState>, id: i64, pinned: bool) -> Result<(), String> {
+    let mut guard = state.lock().map_err(to_err)?;
+    guard.touch();
+    let vault = guard.open.as_ref().ok_or("file vault is locked")?;
+    vault.set_file_pinned(id, pinned).map_err(to_err)
 }
 
 /// Reads each source path from the host filesystem and stores its contents
-/// as a new blob in the vault. Returns how many files were added; a source
-/// path that fails to read is skipped rather than aborting the whole batch.
+/// as a new blob in the vault, inside `folder_id` (`None` = root). Returns
+/// how many files were added; a source path that fails to read is skipped
+/// rather than aborting the whole batch.
 #[tauri::command]
-fn add_files(state: State<'_, FilesState>, paths: Vec<String>) -> Result<usize, String> {
+fn add_files(
+    state: State<'_, FilesState>,
+    folder_id: Option<i64>,
+    paths: Vec<String>,
+) -> Result<usize, String> {
     let mut guard = state.lock().map_err(to_err)?;
     guard.touch();
     let vault = guard.open.as_ref().ok_or("file vault is locked")?;
@@ -300,7 +383,7 @@ fn add_files(state: State<'_, FilesState>, paths: Vec<String>) -> Result<usize, 
         let Ok(data) = std::fs::read(&path) else {
             continue;
         };
-        vault.add_file(&name, &data).map_err(to_err)?;
+        vault.add_file(folder_id, &name, &data).map_err(to_err)?;
         added += 1;
     }
     Ok(added)
@@ -318,6 +401,61 @@ fn extract_file(state: State<'_, FilesState>, id: i64, dest_path: String) -> Res
         .map_err(to_err)?
         .ok_or("file not found")?;
     std::fs::write(PathBuf::from(dest_path), data).map_err(to_err)
+}
+
+#[derive(Serialize)]
+struct FilePreview {
+    name: String,
+    mime: String,
+    size: i64,
+    data_base64: String,
+}
+
+/// Returns a file's contents in-memory (base64-encoded) for the frontend to
+/// render directly — no decrypted copy ever touches the host filesystem,
+/// unlike `extract_file`. Only meant for reasonably small files (documents,
+/// photos); large files would be slow to ship through IPC this way.
+#[tauri::command]
+fn read_file_preview(state: State<'_, FilesState>, id: i64) -> Result<FilePreview, String> {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+
+    let mut guard = state.lock().map_err(to_err)?;
+    guard.touch();
+    let vault = guard.open.as_ref().ok_or("file vault is locked")?;
+    let (meta, data) = vault
+        .read_file(id)
+        .map_err(to_err)?
+        .ok_or("file not found")?;
+
+    Ok(FilePreview {
+        mime: guess_mime(&meta.name).to_string(),
+        name: meta.name,
+        size: meta.size,
+        data_base64: STANDARD.encode(&data),
+    })
+}
+
+fn guess_mime(name: &str) -> &'static str {
+    let ext = name.rsplit('.').next().unwrap_or("").to_lowercase();
+    match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "svg" => "image/svg+xml",
+        "pdf" => "application/pdf",
+        "txt" | "log" => "text/plain",
+        "md" => "text/markdown",
+        "json" => "application/json",
+        "csv" => "text/csv",
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        "ogg" => "audio/ogg",
+        "mp4" => "video/mp4",
+        "webm" => "video/webm",
+        _ => "application/octet-stream",
+    }
 }
 
 #[tauri::command]
@@ -373,8 +511,17 @@ fn main() {
             lock_file_vault,
             is_file_vault_unlocked,
             list_files,
+            list_folders,
+            create_folder,
+            rename_folder,
+            delete_folder,
+            move_folder,
+            set_folder_pinned,
+            move_file,
+            set_file_pinned,
             add_files,
             extract_file,
+            read_file_preview,
             delete_file,
             export_file_vault_backup,
         ])

@@ -110,24 +110,16 @@
     <div id="files-content" class="hidden">
       <div class="toolbar">
         <button id="btn-file-add">+ Добавить файлы</button>
+        <button id="btn-folder-add" class="ghost">+ Новая папка</button>
         <button id="btn-files-backup" class="ghost">⇩ Бэкап</button>
         <button id="btn-files-lock" class="ghost small">Заблокировать</button>
         <span id="files-status"></span>
       </div>
-      <div class="table-panel panel">
+      <div id="files-breadcrumb" class="breadcrumb"></div>
+      <div class="files-desktop panel">
         <div class="corner tl"></div><div class="corner tr"></div>
         <div class="corner bl"></div><div class="corner br"></div>
-        <table id="files-table">
-          <thead>
-            <tr>
-              <th>Имя</th>
-              <th>Размер</th>
-              <th>Обновлено</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="files-body"></tbody>
-        </table>
+        <div id="files-grid" class="files-grid"></div>
       </div>
     </div>
   </div>
@@ -157,6 +149,46 @@
       <button id="btn-save-entry">Сохранить</button>
       <button id="btn-delete-entry" class="danger hidden">Удалить</button>
       <button id="btn-cancel-entry" class="ghost">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div id="preview-modal" class="modal hidden">
+  <div class="modal-card preview-card panel">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div class="preview-header">
+      <span id="preview-title" class="mono"></span>
+      <div class="row">
+        <button id="preview-extract" class="ghost small">⇩ Извлечь</button>
+        <button id="preview-close" class="ghost small">✕ Закрыть</button>
+      </div>
+    </div>
+    <div id="preview-body" class="preview-body"></div>
+  </div>
+</div>
+
+<div id="prompt-modal" class="modal hidden">
+  <div class="modal-card prompt-card panel">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <h2 id="prompt-modal-title">...</h2>
+    <div class="field"><input id="prompt-modal-input" type="text" /></div>
+    <div class="row modal-actions">
+      <button id="prompt-modal-ok">OK</button>
+      <button id="prompt-modal-cancel" class="ghost">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div id="confirm-modal" class="modal hidden">
+  <div class="modal-card prompt-card panel">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <p id="confirm-modal-message" class="confirm-message"></p>
+    <div class="row modal-actions">
+      <button id="confirm-modal-ok" class="danger">Да, удалить</button>
+      <button id="confirm-modal-cancel" class="ghost">Отмена</button>
     </div>
   </div>
 </div>

@@ -244,25 +244,102 @@ button.small { padding: 8px 10px; font-size: 13px; }
 }
 .files-lock-inline .hint { margin-top: 0; margin-bottom: 18px; }
 
-#files-table th {
-  text-align: left;
-  padding: 10px 14px;
+.breadcrumb {
+  padding: 0 24px 12px;
   font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 11.5px;
   color: var(--muted);
-  border-bottom: 1px solid var(--border);
-  background: rgba(53,231,255,0.04);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
-#files-table td {
-  padding: 11px 14px;
-  border-bottom: 1px solid rgba(90,220,255,0.08);
-  font-size: 13.5px;
+.breadcrumb .crumb {
+  cursor: pointer;
+  color: var(--accent);
+  letter-spacing: 0.04em;
 }
-#files-table tbody tr:hover { background: rgba(53,231,255,0.06); }
-#files-table tbody tr:last-child td { border-bottom: none; }
-#files-table { width: 100%; border-collapse: collapse; }
+.breadcrumb .crumb:hover { text-decoration: underline; }
+.breadcrumb .crumb.current { color: var(--text); cursor: default; text-decoration: none; }
+.breadcrumb .sep { opacity: 0.4; }
+
+.files-desktop {
+  margin: 0 24px 24px;
+  padding: 24px;
+  border-radius: 4px;
+  min-height: 260px;
+  position: relative;
+  z-index: 1;
+}
+.files-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 20px;
+}
+
+.file-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 6px 10px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  position: relative;
+  text-align: center;
+  user-select: none;
+  transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
+}
+.file-icon:hover { background: rgba(53,231,255,0.05); border-color: var(--border); }
+.file-icon.drag-over {
+  border-color: var(--accent);
+  background: rgba(53,231,255,0.12);
+  box-shadow: 0 0 16px rgba(53,231,255,0.35);
+}
+.file-icon.dragging { opacity: 0.4; }
+.file-icon .glyph {
+  font-size: 32px;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(53,231,255,0.3));
+}
+.file-icon .label {
+  font-size: 11.5px;
+  line-height: 1.3;
+  word-break: break-word;
+  max-width: 90px;
+  color: var(--text);
+}
+.file-icon .pin-badge {
+  position: absolute;
+  top: 2px;
+  right: 10px;
+  color: var(--warn);
+  font-size: 11px;
+  text-shadow: 0 0 6px rgba(255,181,69,0.6);
+}
+.file-icon .icon-actions {
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  display: none;
+  gap: 3px;
+}
+.file-icon:hover .icon-actions { display: flex; }
+.file-icon .icon-actions button {
+  padding: 3px 6px;
+  font-size: 10px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.files-empty-hint {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: center;
+  padding: 30px 0;
+}
 
 .toolbar {
   display: flex;
@@ -321,6 +398,49 @@ button.small { padding: 8px 10px; font-size: 13px; }
   padding: 28px;
   border-radius: 4px;
 }
+.prompt-card { width: 360px; }
+.confirm-message { margin: 0 0 4px; font-size: 14px; line-height: 1.5; }
+
+.preview-card {
+  width: min(78vw, 900px);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.preview-header .mono { font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
+.preview-body {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  background: #05080c;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 16px;
+}
+.preview-image, .preview-media { max-width: 100%; max-height: 70vh; }
+.preview-frame { width: 100%; height: 70vh; border: none; background: white; }
+.preview-text {
+  width: 100%;
+  max-height: 70vh;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  text-align: left;
+}
+
 .modal-card h2 {
   margin: 0 0 18px;
   font-family: var(--mono);
