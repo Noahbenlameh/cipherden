@@ -1,0 +1,20 @@
+[package]
+name = "vault-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Encrypted storage core for SecureVault: Argon2id KDF + SQLCipher-backed entry store. No UI dependencies."
+
+[dependencies]
+argon2 = "0.5"
+base64 = "0.22"
+rusqlite = { version = "0.31", features = ["bundled-sqlcipher-vendored-openssl"] }
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+zeroize = { version = "1", features = ["derive"] }
+time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
+
+[dev-dependencies]
+tempfile = "3"

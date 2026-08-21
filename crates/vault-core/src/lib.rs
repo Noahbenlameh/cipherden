@@ -1,0 +1,25 @@
+//! vault-core: encrypted storage core for SecureVault.
+//!
+//! This crate has no UI dependencies and is responsible for exactly one
+//! thing: turning a master password plus a directory on disk into a durable,
+//! authenticated, encrypted store of password entries.
+//!
+//! Cryptographic primitives are never implemented here — only wired up from
+//! vetted libraries: Argon2id via the RustCrypto `argon2` crate for the KDF,
+//! and SQLCipher (via `rusqlite`'s `bundled-sqlcipher` feature) for
+//! authenticated AES-256 encryption at rest.
+
+pub mod error;
+pub mod kdf;
+pub mod meta;
+pub mod store;
+
+pub use error::{Result, VaultError};
+pub use kdf::Argon2Params;
+pub use store::{Entry, NewEntry, Vault};
+
+pub(crate) fn now_rfc3339() -> String {
+    time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .expect("RFC3339 formatting of a valid OffsetDateTime cannot fail")
+}

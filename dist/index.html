@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>SecureVault</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<section id="lock-screen" class="screen">
+  <div class="lock-card">
+    <h1>SecureVault</h1>
+    <p class="hint">Путь к файлу хранилища (например: <code>./vault/vault.db</code>)</p>
+    <input id="vault-path" type="text" placeholder="./vault/vault.db" value="./vault/vault.db" />
+    <input id="master-password" type="password" placeholder="Мастер-пароль" />
+    <div class="row">
+      <button id="btn-open">Открыть хранилище</button>
+      <button id="btn-create" class="secondary">Создать новое</button>
+    </div>
+    <p id="lock-error" class="error"></p>
+    <p class="warn">При создании нового хранилища сделайте минимум 2 резервные копии на разных носителях (правило 3-2-1) — см. кнопку «Резервная копия» после открытия.</p>
+  </div>
+</section>
+
+<section id="dashboard" class="screen hidden">
+  <header>
+    <h1>SecureVault</h1>
+    <input id="search" type="text" placeholder="Поиск по названию, логину, URL, категории..." />
+    <button id="btn-lock">Заблокировать</button>
+  </header>
+
+  <div class="toolbar">
+    <button id="btn-add">+ Новая запись</button>
+    <button id="btn-backup">Резервная копия</button>
+    <span id="status"></span>
+  </div>
+
+  <table id="entries-table">
+    <thead>
+      <tr>
+        <th>Название</th>
+        <th>Логин</th>
+        <th>URL</th>
+        <th>Категория</th>
+        <th>Обновлено</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="entries-body"></tbody>
+  </table>
+</section>
+
+<div id="entry-modal" class="modal hidden">
+  <div class="modal-card">
+    <h2 id="entry-modal-title">Новая запись</h2>
+    <input type="hidden" id="entry-id" />
+    <label>Название<input id="f-title" type="text" /></label>
+    <label>Логин<input id="f-username" type="text" /></label>
+    <label>Пароль
+      <div class="row">
+        <input id="f-password" type="text" />
+        <button id="btn-generate" type="button">Сгенерировать</button>
+        <button id="btn-copy-password" type="button">Копировать</button>
+      </div>
+    </label>
+    <label>URL<input id="f-url" type="text" /></label>
+    <label>Категория<input id="f-category" type="text" /></label>
+    <label>Заметка<textarea id="f-notes"></textarea></label>
+    <div class="row">
+      <button id="btn-save-entry">Сохранить</button>
+      <button id="btn-delete-entry" class="danger hidden">Удалить</button>
+      <button id="btn-cancel-entry" class="secondary">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

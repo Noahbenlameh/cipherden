@@ -1,0 +1,17 @@
+[package]
+name = "securevault"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SecureVault desktop shell: Tauri backend wiring vault-core to a local dashboard UI."
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+vault-core = { path = "../crates/vault-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+arboard = "3"
+rand = "0.8"
