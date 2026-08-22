@@ -4,10 +4,13 @@
 //! home-grown KDF is implemented here, per project policy: all cryptographic
 //! primitives must come from vetted, maintained libraries.
 
+use std::alloc::{alloc, dealloc, Layout};
+use std::ptr::NonNull;
+
 use argon2::{Algorithm, Argon2, Params, Version};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::Zeroize;
 
 use crate::error::{Result, VaultError};
 
@@ -48,12 +51,91 @@ impl Argon2Params {
     }
 }
 
-#[derive(Zeroize, ZeroizeOnDrop)]
-pub struct VaultKey(pub(crate) [u8; KEY_LEN]);
+/// A 32-byte key, held in a dedicated, page-locked (`mlock`/`VirtualLock`)
+/// heap allocation so it's never paged out to disk (swap), and zeroed on
+/// drop. Each `VaultKey` gets its own OS page (rather than sharing a heap
+/// page with unrelated allocations) so that one key's lock/unlock lifecycle
+/// can never affect another's.
+///
+/// Locking is best-effort: some environments (containers, restrictive
+/// `RLIMIT_MEMLOCK`) refuse it for an unprivileged process. We still
+/// function without it — the key is still zeroized on drop and out of the
+/// normal allocator's reuse pool during its lifetime either way, this just
+/// hardens the "never touches swap while live" property specifically.
+pub struct VaultKey {
+    ptr: NonNull<u8>,
+    layout: Layout,
+    _lock: Option<region::LockGuard>,
+}
+
+// SAFETY: `VaultKey` owns its allocation exclusively (nothing else ever
+// gets a pointer into it) and exposes only shared (`&`) access to the
+// bytes, so sending it to / sharing it across threads is sound — exactly
+// the same reasoning that makes `Box<[u8; N]>` Send+Sync, plus the same
+// reasoning `region::LockGuard` itself is already Send+Sync for.
+unsafe impl Send for VaultKey {}
+unsafe impl Sync for VaultKey {}
 
 impl VaultKey {
+    fn from_bytes(bytes: [u8; KEY_LEN]) -> Self {
+        let page_size = region::page::size().max(KEY_LEN);
+        let layout = Layout::from_size_align(page_size, page_size)
+            .expect("OS page size is always a valid non-zero power-of-two alignment");
+
+        // SAFETY: `layout` has non-zero size.
+        let raw = unsafe { alloc(layout) };
+        let ptr = NonNull::new(raw).expect("single-page allocation failure is unrecoverable");
+
+        // SAFETY: `ptr` points to a fresh `page_size`-byte allocation and
+        // `KEY_LEN <= page_size`, so writing `KEY_LEN` bytes is in bounds
+        // and doesn't overlap `bytes`.
+        unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr.as_ptr(), KEY_LEN) };
+
+        let lock = region::lock(ptr.as_ptr(), page_size).ok();
+
+        Self {
+            ptr,
+            layout,
+            _lock: lock,
+        }
+    }
+
+    /// Generate a fresh random 32-byte key directly (not derived from a
+    /// password) — used as a Shell's actual data-encryption key, which is
+    /// then wrapped under one or more password-derived key-encryption keys
+    /// (see `keyslots.rs`) rather than being an Argon2id output itself.
+    pub fn random() -> Self {
+        let mut bytes = [0u8; KEY_LEN];
+        rand::thread_rng().fill_bytes(&mut bytes);
+        let key = Self::from_bytes(bytes);
+        bytes.zeroize();
+        key
+    }
+
+    pub(crate) fn from_raw(bytes: [u8; KEY_LEN]) -> Self {
+        Self::from_bytes(bytes)
+    }
+
     pub fn as_bytes(&self) -> &[u8; KEY_LEN] {
-        &self.0
+        // SAFETY: the first `KEY_LEN` bytes of this allocation were
+        // initialized by `from_bytes` and never written to since.
+        unsafe { &*self.ptr.as_ptr().cast::<[u8; KEY_LEN]>() }
+    }
+}
+
+impl Drop for VaultKey {
+    fn drop(&mut self) {
+        // SAFETY: zero exactly the `KEY_LEN` bytes we initialized, via a
+        // volatile write so the optimizer can't elide it as a dead store
+        // right before `dealloc`. `_lock` (if present) is unlocked
+        // automatically right after this function returns, as part of the
+        // struct's normal field-drop sequence.
+        unsafe {
+            for i in 0..KEY_LEN {
+                std::ptr::write_volatile(self.ptr.as_ptr().add(i), 0);
+            }
+            dealloc(self.ptr.as_ptr(), self.layout);
+        }
     }
 }
 
@@ -87,5 +169,46 @@ pub fn derive_key(
         .hash_password_into(password, salt, &mut out)
         .map_err(|e| VaultError::Kdf(e.to_string()))?;
 
-    Ok(VaultKey(out))
+    let key = VaultKey::from_bytes(out);
+    out.zeroize();
+    Ok(key)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vault_key_round_trips_its_bytes() {
+        let bytes = [7u8; KEY_LEN];
+        let key = VaultKey::from_raw(bytes);
+        assert_eq!(key.as_bytes(), &bytes);
+    }
+
+    #[test]
+    fn vault_key_random_produces_distinct_keys() {
+        let a = VaultKey::random();
+        let b = VaultKey::random();
+        assert_ne!(a.as_bytes(), b.as_bytes());
+    }
+
+    #[test]
+    fn many_vault_keys_can_be_created_and_dropped_without_crashing() {
+        // Each VaultKey locks its own dedicated OS page; this exercises
+        // that repeatedly allocating/locking/zeroing/unlocking/freeing
+        // doesn't leak, double-free, or otherwise misbehave.
+        for _ in 0..500 {
+            let key = VaultKey::random();
+            std::hint::black_box(key.as_bytes());
+        }
+    }
+
+    #[test]
+    fn derive_key_is_deterministic_for_the_same_inputs() {
+        let salt = [1u8; SALT_LEN];
+        let params = Argon2Params::for_testing();
+        let a = derive_key(b"password", &salt, params).unwrap();
+        let b = derive_key(b"password", &salt, params).unwrap();
+        assert_eq!(a.as_bytes(), b.as_bytes());
+    }
 }

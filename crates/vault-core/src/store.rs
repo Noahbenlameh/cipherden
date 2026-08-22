@@ -9,7 +9,7 @@ use crate::kdf::{Argon2Params, VaultKey};
 use crate::meta::meta_path_for;
 use crate::now_rfc3339;
 
-const SCHEMA: &str = "
+pub(crate) const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS entries (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     title       TEXT NOT NULL,
@@ -49,7 +49,7 @@ pub struct NewEntry {
 
 pub struct Vault {
     conn: Connection,
-    db_path: PathBuf,
+    db_path: Option<PathBuf>,
     #[allow(dead_code)] // retained so the key stays alive/zeroizable for the vault's lifetime
     key: VaultKey,
 }
@@ -74,7 +74,11 @@ impl Vault {
     ) -> Result<Self> {
         let db_path = db_path.as_ref().to_path_buf();
         let (conn, key) = container::create(&db_path, master_password, params, SCHEMA)?;
-        Ok(Self { conn, db_path, key })
+        Ok(Self {
+            conn,
+            db_path: Some(db_path),
+            key,
+        })
     }
 
     /// Open an existing vault. Returns `VaultError::InvalidPassword` if the
@@ -83,11 +87,38 @@ impl Vault {
     pub fn open(db_path: impl AsRef<Path>, master_password: &str) -> Result<Self> {
         let db_path = db_path.as_ref().to_path_buf();
         let (conn, key) = container::open(&db_path, master_password, SCHEMA)?;
-        Ok(Self { conn, db_path, key })
+        Ok(Self {
+            conn,
+            db_path: Some(db_path),
+            key,
+        })
     }
 
-    pub fn db_path(&self) -> &Path {
-        &self.db_path
+    /// Wrap an already-open connection (e.g. an embedded zone's in-memory
+    /// database, deserialized by a `Shell`) as a `Vault`. There is no real
+    /// file behind this — `db_path()` returns `None`, and `export_backup`
+    /// (which only makes sense for a file-backed vault) will error.
+    pub(crate) fn wrap(conn: Connection, key: VaultKey) -> Self {
+        Self {
+            conn,
+            db_path: None,
+            key,
+        }
+    }
+
+    pub fn db_path(&self) -> Option<&Path> {
+        self.db_path.as_deref()
+    }
+
+    /// Raw serialized bytes of this vault's current state — used by `Shell`
+    /// to persist an embedded zone's in-memory database back into its own
+    /// encrypted blob after a mutation.
+    pub(crate) fn serialize(&self) -> Result<Vec<u8>> {
+        container::serialize_to_bytes(&self.conn)
+    }
+
+    pub(crate) fn key(&self) -> &VaultKey {
+        &self.key
     }
 
     pub fn add_entry(&self, entry: &NewEntry) -> Result<i64> {
@@ -186,6 +217,13 @@ impl Vault {
     /// same master password. This is the "3-2-1 backup" button from the
     /// spec's mandatory disk-failure protection section — not optional.
     pub fn export_backup(&self, dest_dir: impl AsRef<Path>) -> Result<PathBuf> {
+        let db_path = self.db_path.as_ref().ok_or_else(|| {
+            VaultError::InvalidMeta(
+                "this vault is an embedded zone with no backing file to back up directly \
+                 (use the Shell's own export/backup instead)"
+                    .into(),
+            )
+        })?;
         let dest_dir = dest_dir.as_ref();
         std::fs::create_dir_all(dest_dir)?;
 
@@ -193,14 +231,13 @@ impl Vault {
         self.conn
             .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
 
-        let file_name = self
-            .db_path
+        let file_name = db_path
             .file_name()
             .ok_or_else(|| VaultError::InvalidMeta("vault path has no file name".into()))?;
         let dest_db = dest_dir.join(file_name);
-        std::fs::copy(&self.db_path, &dest_db)?;
+        std::fs::copy(db_path, &dest_db)?;
 
-        let src_meta = meta_path_for(&self.db_path);
+        let src_meta = meta_path_for(db_path);
         let dest_meta = meta_path_for(&dest_db);
         std::fs::copy(&src_meta, &dest_meta)?;
 

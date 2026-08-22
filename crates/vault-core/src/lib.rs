@@ -15,12 +15,19 @@ pub mod export;
 pub mod files;
 pub mod import;
 pub mod kdf;
+mod keyslots;
+pub mod ledger;
 pub mod meta;
+pub mod seeds;
+pub mod shell;
 pub mod store;
 
 pub use error::{Result, VaultError};
 pub use files::FileVault;
 pub use kdf::Argon2Params;
+pub use ledger::{LedgerVault, Transaction};
+pub use seeds::{NewSeedEntry, SeedEntry, SeedVault};
+pub use shell::{OpenZone, Shell, ZoneKind, ZoneMeta, PRIMARY_SLOT, RECOVERY_SLOT};
 pub use store::{Entry, NewEntry, Vault};
 
 pub(crate) fn now_rfc3339() -> String {

@@ -65,15 +65,17 @@ pub fn meta_path_for(db_path: &Path) -> std::path::PathBuf {
 }
 
 // Minimal base64 (standard, no padding stripped) without pulling in a whole
-// extra crate just for this; used only for the salt, which is 16 bytes.
-fn base64_encode(bytes: &[u8]) -> String {
+// extra crate just for this; used for salts and wrapped keys, all small.
+pub(crate) fn base64_encode(bytes: &[u8]) -> String {
     use base64_impl::Engine;
     base64_impl::engine::general_purpose::STANDARD.encode(bytes)
 }
 
-fn base64_decode(s: &str) -> std::result::Result<Vec<u8>, base64_impl::DecodeError> {
+pub(crate) fn base64_decode(s: &str) -> std::result::Result<Vec<u8>, String> {
     use base64_impl::Engine;
-    base64_impl::engine::general_purpose::STANDARD.decode(s)
+    base64_impl::engine::general_purpose::STANDARD
+        .decode(s)
+        .map_err(|e| e.to_string())
 }
 
 mod base64_impl {

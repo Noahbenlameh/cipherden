@@ -19,45 +19,73 @@
     </div>
 
     <div class="field">
-      <label class="field-label" for="vault-path">Путь к хранилищу</label>
-      <input id="vault-path" type="text" placeholder="./vault/vault.db" value="./vault/vault.db" />
+      <label class="field-label" for="shell-path">Путь к оболочке</label>
+      <input id="shell-path" type="text" placeholder="./vault/shell.vault" value="./vault/shell.vault" />
     </div>
     <div class="field">
-      <label class="field-label" for="master-password">Мастер-пароль</label>
-      <input id="master-password" type="password" placeholder="••••••••" />
+      <label class="field-label" for="shell-password">Пароль</label>
+      <input id="shell-password" type="password" placeholder="Для входа — любой из действующих паролей" />
+    </div>
+
+    <label class="checkbox-row" for="shell-add-recovery">
+      <input type="checkbox" id="shell-add-recovery" checked />
+      Добавить резервный пароль (можно и потом, через «Смену пароля»)
+    </label>
+    <div class="field" id="shell-recovery-field">
+      <label class="field-label" for="shell-recovery-password">Резервный пароль</label>
+      <input id="shell-recovery-password" type="password" placeholder="Второй, независимый пароль" />
     </div>
 
     <div class="row">
-      <button id="btn-open">Открыть</button>
-      <button id="btn-create" class="ghost">Создать новое</button>
+      <button id="btn-shell-open">Открыть</button>
+      <button id="btn-shell-create" class="ghost">Создать новое</button>
     </div>
     <p id="lock-error" class="error"></p>
-    <p class="warn">При создании нового хранилища сделайте минимум 2 резервные копии на разных носителях (правило 3-2-1) — кнопка «Бэкап» доступна после открытия.</p>
+    <p id="lock-warn" class="warn"></p>
   </div>
 </section>
 
-<section id="dashboard" class="screen hidden">
+<section id="desktop" class="screen hidden">
   <header class="hud-bar">
     <div class="hud-brand"><span class="brand-mark small">◈</span> CIPHERDEN</div>
-    <input id="search" type="text" placeholder="ПОИСК: название · логин · URL · категория" />
     <div class="hud-status">
       <span class="dot"></span>
-      <span id="entry-count">0 записей</span>
+      <span id="zone-count">0 разделов</span>
       <span class="hud-sep">|</span>
-      <span id="session-timer">05:00</span>
+      <span id="shell-session-timer">05:00</span>
     </div>
-    <button id="btn-lock" class="ghost small">Заблокировать</button>
+    <button id="btn-shell-lock" class="ghost small">Заблокировать оболочку</button>
   </header>
 
-  <div class="zone-tabs">
-    <button class="zone-tab active" data-zone="accounts">🔑 АККАУНТЫ</button>
-    <button class="zone-tab" data-zone="files">🗂 ФАЙЛЫ</button>
+  <div class="toolbar">
+    <button id="btn-zone-add">+ Новый раздел</button>
+    <button id="btn-shell-backup" class="ghost">⇩ Бэкап оболочки</button>
+    <button id="btn-shell-password" class="ghost">🔑 Смена пароля</button>
+    <span id="desktop-status"></span>
   </div>
 
-  <div id="zone-accounts" class="zone-panel">
+  <div class="files-desktop panel" style="margin: 0 24px 24px;">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div id="zones-grid" class="files-grid"></div>
+  </div>
+</section>
+
+<section id="zone-view" class="screen hidden">
+  <header class="hud-bar">
+    <button id="btn-zone-back" class="ghost small">← Рабочий стол</button>
+    <div id="zone-view-title" class="hud-brand"></div>
+    <input id="search" type="text" class="hidden" placeholder="ПОИСК: название · логин · URL · категория" />
+    <div class="hud-status">
+      <span class="dot"></span>
+      <span id="zone-session-timer">05:00</span>
+    </div>
+    <button id="btn-zone-lock" class="ghost small">Заблокировать раздел</button>
+  </header>
+
+  <div id="accounts-content" class="hidden">
     <div class="toolbar">
       <button id="btn-add">+ Новая запись</button>
-      <button id="btn-backup" class="ghost">⇩ Бэкап</button>
       <button id="btn-import-csv" class="ghost">⇧ Импорт CSV</button>
       <button id="btn-import-kdbx" class="ghost">⇧ Импорт KeePass</button>
       <button id="btn-export-selected" class="ghost">⇩ Экспорт выбранного</button>
@@ -87,40 +115,63 @@
     </div>
   </div>
 
-  <div id="zone-files" class="zone-panel hidden">
-    <div id="files-lock" class="files-lock-inline panel">
+  <div id="files-content" class="hidden">
+    <div class="toolbar">
+      <button id="btn-file-add">+ Добавить файлы</button>
+      <button id="btn-folder-add" class="ghost">+ Новая папка</button>
+      <span id="files-status"></span>
+    </div>
+    <div id="files-breadcrumb" class="breadcrumb"></div>
+    <div class="files-desktop panel">
       <div class="corner tl"></div><div class="corner tr"></div>
       <div class="corner bl"></div><div class="corner br"></div>
-      <p class="hint">Файловое хранилище — отдельная зашифрованная зона, со своим паролем (может отличаться от пароля аккаунтов).</p>
-      <div class="field">
-        <label class="field-label" for="files-path">Путь к хранилищу файлов</label>
-        <input id="files-path" type="text" placeholder="./vault/files.vault" value="./vault/files.vault" />
-      </div>
-      <div class="field">
-        <label class="field-label" for="files-password">Пароль</label>
-        <input id="files-password" type="password" placeholder="••••••••" />
-      </div>
-      <div class="row">
-        <button id="btn-files-open">Открыть</button>
-        <button id="btn-files-create" class="ghost">Создать новое</button>
-      </div>
-      <p id="files-lock-error" class="error"></p>
+      <div id="files-grid" class="files-grid"></div>
     </div>
+  </div>
 
-    <div id="files-content" class="hidden">
-      <div class="toolbar">
-        <button id="btn-file-add">+ Добавить файлы</button>
-        <button id="btn-folder-add" class="ghost">+ Новая папка</button>
-        <button id="btn-files-backup" class="ghost">⇩ Бэкап</button>
-        <button id="btn-files-lock" class="ghost small">Заблокировать</button>
-        <span id="files-status"></span>
-      </div>
-      <div id="files-breadcrumb" class="breadcrumb"></div>
-      <div class="files-desktop panel">
-        <div class="corner tl"></div><div class="corner tr"></div>
-        <div class="corner bl"></div><div class="corner br"></div>
-        <div id="files-grid" class="files-grid"></div>
-      </div>
+  <div id="seeds-content" class="hidden">
+    <div class="toolbar">
+      <button id="btn-seed-add">+ Новая запись</button>
+      <span id="seeds-status"></span>
+    </div>
+    <div class="table-panel panel">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <table id="seeds-table">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Сеть</th>
+            <th>Путь деривации</th>
+            <th>Обновлено</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="seeds-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="ledger-content" class="hidden">
+    <div class="toolbar ledger-toolbar">
+      <button id="btn-tx-add">+ Новая запись</button>
+      <span id="ledger-status"></span>
+      <div id="ledger-total" class="ledger-total">Общий итог: <span id="ledger-total-value">0,00</span></div>
+    </div>
+    <div class="table-panel panel">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <table id="ledger-table">
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Движение ср-в</th>
+            <th>Комментарий</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="ledger-body"></tbody>
+      </table>
     </div>
   </div>
 </section>
@@ -149,6 +200,95 @@
       <button id="btn-save-entry">Сохранить</button>
       <button id="btn-delete-entry" class="danger hidden">Удалить</button>
       <button id="btn-cancel-entry" class="ghost">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div id="seed-modal" class="modal hidden">
+  <div class="modal-card panel">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+
+    <h2 id="seed-modal-title">Новая запись</h2>
+    <input type="hidden" id="seed-id" />
+    <div class="field"><label class="field-label">Название/метка кошелька</label><input id="sf-label" type="text" /></div>
+    <div class="field"><label class="field-label">Сеть/тип кошелька</label><input id="sf-network" type="text" placeholder="Bitcoin, Ethereum..." /></div>
+    <div class="field"><label class="field-label">Путь деривации</label><input id="sf-derivation" type="text" class="mono" placeholder="m/44'/0'/0'/0/0" /></div>
+    <div class="field"><label class="field-label">Seed-фраза</label><textarea id="sf-phrase" class="mono"></textarea></div>
+    <div class="field"><label class="field-label">Заметка</label><textarea id="sf-notes"></textarea></div>
+    <div class="row modal-actions">
+      <button id="btn-save-seed">Сохранить</button>
+      <button id="btn-delete-seed" class="danger hidden">Удалить</button>
+      <button id="btn-cancel-seed" class="ghost">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div id="tx-modal" class="modal hidden">
+  <div class="modal-card prompt-card panel">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+
+    <h2 id="tx-modal-title">Новая запись</h2>
+    <input type="hidden" id="tx-id" />
+    <div class="field">
+      <label class="field-label">Движение средств</label>
+      <input id="tf-amount" type="text" class="mono" placeholder="-500,22 или +700,96" />
+    </div>
+    <div class="field"><label class="field-label">Комментарий</label><input id="tf-comment" type="text" /></div>
+    <p id="tx-date-hint" class="hint hidden"></p>
+    <p id="tx-modal-error" class="error"></p>
+    <div class="row modal-actions">
+      <button id="btn-save-tx">Сохранить</button>
+      <button id="btn-delete-tx" class="danger hidden">Удалить</button>
+      <button id="btn-cancel-tx" class="ghost">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div id="change-password-modal" class="modal hidden">
+  <div class="modal-card prompt-card panel">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <h2>Смена пароля оболочки</h2>
+    <p class="hint">Забыли один пароль? Введите любой из двух РАБОЧИХ паролей, чтобы задать новое значение для основного или резервного.</p>
+    <div class="field"><label class="field-label">Любой действующий пароль (основной или резервный)</label><input id="cp-known" type="password" /></div>
+    <div class="field">
+      <label class="field-label">Какой пароль меняем</label>
+      <div class="row">
+        <button type="button" id="cp-slot-primary" class="slot-choice active" data-slot="primary">Основной</button>
+        <button type="button" id="cp-slot-recovery" class="slot-choice" data-slot="recovery">Резервный</button>
+      </div>
+    </div>
+    <div class="field"><label class="field-label">Новый пароль для выбранного слота</label><input id="cp-new" type="password" /></div>
+    <p id="change-password-error" class="error"></p>
+    <div class="row modal-actions">
+      <button id="btn-change-password-submit">Сменить</button>
+      <button id="btn-change-password-cancel" class="ghost">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div id="new-zone-modal" class="modal hidden">
+  <div class="modal-card prompt-card panel">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <h2>Новый раздел</h2>
+    <div class="field">
+      <label class="field-label">Тип раздела</label>
+      <div class="row kind-choice-row">
+        <button type="button" id="nz-kind-accounts" class="kind-choice active" data-kind="accounts">🔑 Аккаунты</button>
+        <button type="button" id="nz-kind-files" class="kind-choice" data-kind="files">🗂 Файлы</button>
+        <button type="button" id="nz-kind-seeds" class="kind-choice" data-kind="seeds">🌱 Seed</button>
+        <button type="button" id="nz-kind-ledger" class="kind-choice" data-kind="ledger">💰 Баланс</button>
+      </div>
+    </div>
+    <div class="field"><label class="field-label">Название раздела</label><input id="nz-label" type="text" placeholder="Например: Личные аккаунты" /></div>
+    <div class="field"><label class="field-label">Пароль раздела</label><input id="nz-password" type="password" placeholder="Свой пароль, отдельный от оболочки" /></div>
+    <p id="new-zone-error" class="error"></p>
+    <div class="row modal-actions">
+      <button id="btn-new-zone-create">Создать</button>
+      <button id="btn-new-zone-cancel" class="ghost">Отмена</button>
     </div>
   </div>
 </div>
