@@ -174,8 +174,8 @@ fn ledger_zone_round_trips_through_shell() {
     let OpenZone::Ledger(vault) = shell.open_zone(zone_id, "ledger-pw").unwrap() else {
         panic!("expected Ledger zone");
     };
-    vault.add_transaction(70_096, "Salary").unwrap();
-    vault.add_transaction(-50_022, "Rent").unwrap();
+    vault.add_transaction(70_096, "Salary", None).unwrap();
+    vault.add_transaction(-50_022, "Rent", None).unwrap();
     shell.save_zone(zone_id, &OpenZone::Ledger(vault)).unwrap();
 
     let OpenZone::Ledger(vault) = shell.open_zone(zone_id, "ledger-pw").unwrap() else {

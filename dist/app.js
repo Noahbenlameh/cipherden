@@ -1776,6 +1776,7 @@ function openTxModal(tx) {
   editingTxId = tx.id;
   document.getElementById("tx-modal-title").textContent = "Редактировать запись";
   document.getElementById("tx-id").value = tx.id;
+  document.getElementById("tf-date-field").classList.add("hidden");
   document.getElementById("tf-amount").value = formatCents(tx.amount_cents);
   document.getElementById("tf-comment").value = tx.comment;
   const hint = document.getElementById("tx-date-hint");
@@ -1789,6 +1790,8 @@ function openTxModal(tx) {
 document.getElementById("btn-tx-add").addEventListener("click", () => {
   editingTxId = null;
   document.getElementById("tx-modal-title").textContent = "Новая запись";
+  document.getElementById("tf-date-field").classList.remove("hidden");
+  document.getElementById("tf-date").value = "";
   document.getElementById("tf-amount").value = "";
   document.getElementById("tf-comment").value = "";
   document.getElementById("tx-date-hint").classList.add("hidden");
@@ -1814,7 +1817,8 @@ document.getElementById("btn-save-tx").addEventListener("click", async () => {
     if (editingTxId != null) {
       await invoke("update_transaction", { zoneId: currentZoneId, id: editingTxId, amountCents, comment });
     } else {
-      await invoke("add_transaction", { zoneId: currentZoneId, amountCents, comment });
+      const date = document.getElementById("tf-date").value || null;
+      await invoke("add_transaction", { zoneId: currentZoneId, amountCents, comment, date });
     }
     txModal.classList.add("hidden");
     refreshLedger();

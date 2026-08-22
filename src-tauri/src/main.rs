@@ -1003,6 +1003,23 @@ fn list_transactions_with_total(
     })
 }
 
+/// A manually-entered date (e.g. importing an old paper ledger) comes in
+/// as an HTML `<input type="date">` value: exactly "YYYY-MM-DD". Reject
+/// anything else rather than silently storing a malformed date string.
+fn valid_ledger_date(date: &str) -> bool {
+    let bytes = date.as_bytes();
+    bytes.len() == 10
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes.iter().enumerate().all(|(i, b)| {
+            if i == 4 || i == 7 {
+                true
+            } else {
+                b.is_ascii_digit()
+            }
+        })
+}
+
 #[tauri::command]
 fn add_transaction(
     sessions: State<'_, SessionsState>,
@@ -1010,9 +1027,19 @@ fn add_transaction(
     zone_id: i64,
     amount_cents: i64,
     comment: String,
+    date: Option<String>,
 ) -> Result<i64, String> {
+    let date = match date.as_deref() {
+        Some(d) if !d.is_empty() => {
+            if !valid_ledger_date(d) {
+                return Err("Дата должна быть в формате ГГГГ-ММ-ДД.".into());
+            }
+            Some(d)
+        }
+        _ => None,
+    };
     with_ledger_zone(&sessions, &shell, zone_id, true, |v| {
-        v.add_transaction(amount_cents, &comment).map_err(to_err)
+        v.add_transaction(amount_cents, &comment, date).map_err(to_err)
     })
 }
 

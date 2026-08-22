@@ -96,14 +96,20 @@ impl LedgerVault {
     }
 
     /// Record a transaction with `amount_cents` (positive = inflow, negative
-    /// = outflow) and a free-text comment. The date is set automatically to
-    /// the moment of recording — there is deliberately no way to backdate
-    /// an entry.
-    pub fn add_transaction(&self, amount_cents: i64, comment: &str) -> Result<i64> {
-        let now = now_rfc3339();
+    /// = outflow) and a free-text comment. `date` lets old data (e.g. an
+    /// import of a paper ledger) keep its real date instead of the moment
+    /// it was typed in; pass `None` to stamp the current moment, same as
+    /// before backdating existed.
+    pub fn add_transaction(
+        &self,
+        amount_cents: i64,
+        comment: &str,
+        date: Option<&str>,
+    ) -> Result<i64> {
+        let date = date.map(str::to_string).unwrap_or_else(now_rfc3339);
         self.conn.execute(
             "INSERT INTO transactions (date, amount_cents, comment) VALUES (?1, ?2, ?3)",
-            rusqlite::params![now, amount_cents, comment],
+            rusqlite::params![date, amount_cents, comment],
         )?;
         Ok(self.conn.last_insert_rowid())
     }
