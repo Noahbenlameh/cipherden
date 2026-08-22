@@ -1,42 +1,45 @@
-# Security Policy
+# Политика безопасности
 
-## Design principles
+## Принципы проектирования
 
-1. **No home-grown cryptography.** Every cryptographic primitive comes from
-   an established, maintained library:
-   - Key derivation: Argon2id via the RustCrypto [`argon2`](https://crates.io/crates/argon2) crate.
-   - Encryption at rest: [SQLCipher](https://www.zetetic.net/sqlcipher/) (AES-256, authenticated per-page via HMAC), via `rusqlite`'s bundled build.
-   - Randomness: the operating system CSPRNG via the [`rand`](https://crates.io/crates/rand) crate.
+1. **Никакой самодельной криптографии.** Каждый криптографический примитив
+   берётся из проверенной, поддерживаемой библиотеки:
+   - Деривация ключа: Argon2id через крейт RustCrypto [`argon2`](https://crates.io/crates/argon2).
+   - Шифрование хранимых данных: [SQLCipher](https://www.zetetic.net/sqlcipher/) (AES-256, аутентификация каждой страницы через HMAC), через встроенную сборку `rusqlite`.
+   - Генерация случайных чисел: CSPRNG операционной системы через крейт [`rand`](https://crates.io/crates/rand).
 
-   If a needed capability isn't available in a vetted library, the correct
-   response is to stop and discuss with a human, not to write a custom
-   implementation. This applies to AI coding agents working on this
-   repository as much as to human contributors.
+   Если нужная возможность недоступна в проверенной библиотеке, правильная
+   реакция — остановиться и обсудить с человеком, а не писать собственную
+   реализацию. Это относится как к ИИ-агентам, работающим над этим
+   репозиторием, так и к людям-контрибьюторам.
 
-2. **Local-only by default.** The application's local web server binds only
-   to `127.0.0.1`. It must never listen on `0.0.0.0` or any other interface
-   unless a future, explicitly-opt-in feature says otherwise, and any such
-   feature requires a security review before merging.
+2. **По умолчанию только локально.** Локальный веб-сервер приложения
+   привязывается только к `127.0.0.1`. Он никогда не должен слушать
+   `0.0.0.0` или любой другой интерфейс, если только будущая, явно
+   opt-in-функция не скажет иначе, а любая такая функция требует
+   проверки безопасности перед слиянием.
 
-3. **No telemetry.** The application makes no outbound network calls of any
-   kind in its default configuration.
+3. **Никакой телеметрии.** В конфигурации по умолчанию приложение не
+   делает исходящих сетевых запросов никакого рода.
 
-4. **Master password never touches disk.** Only the Argon2id-derived key is
-   used, and only in memory. It is wrapped in a type that zeroizes on drop.
+4. **Мастер-пароль никогда не касается диска.** Используется только
+   производный ключ Argon2id, и только в памяти. Он обёрнут в тип,
+   который обнуляется при уничтожении (drop).
 
-See `THREAT_MODEL.md` for what this protects against and what it explicitly
-does not.
+Что именно это защищает и чего явно не защищает — см. `THREAT_MODEL.md`.
 
-## Reporting a vulnerability
+## Сообщить об уязвимости
 
-This project has not yet had its first release or independent security
-audit. Until a formal disclosure channel is set up, please open a GitHub
-issue marked `security` with as much detail as you can share, or contact the
-maintainer directly if the issue is sensitive enough that a public issue
-would be irresponsible.
+У этого проекта ещё не было ни первого релиза, ни независимого аудита
+безопасности. Пока не настроен формальный канал раскрытия информации,
+пожалуйста, откройте issue на GitHub с меткой `security` и максимумом
+деталей, которыми можно поделиться, либо свяжитесь с мейнтейнером
+напрямую, если проблема настолько чувствительна, что публичный issue
+был бы безответственным.
 
-## Pre-commercial audit requirement
+## Требование аудита перед коммерческим релизом
 
-Per the project roadmap, an independent third-party security audit is a
-hard requirement before any commercial release — not an optional milestone.
-No commercial release should ship without one.
+Согласно дорожной карте проекта, независимый сторонний аудит
+безопасности — это жёсткое требование перед любым коммерческим
+релизом, а не опциональная веха. Ни один коммерческий релиз не должен
+выходить без него.

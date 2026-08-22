@@ -1,157 +1,176 @@
 # CIPHERDEN
 
-*(formerly "SecureVault" during early development — same project, new name)*
+*(на ранних этапах разработки назывался «SecureVault» — тот же проект, новое название)*
 
-A portable, fully offline password and sensitive-data manager. Data lives
-encrypted on a removable drive (SSD/USB); pull the drive and nothing usable
-is left on the host machine. The dashboard aims for the everyday
-familiarity of a spreadsheet, not the friction of a traditional password
-manager form.
+Портативный, полностью офлайн менеджер паролей и чувствительных данных.
+Данные хранятся зашифрованными на съёмном накопителе (SSD/USB); вынули
+накопитель — на хост-машине не осталось ничего пригодного к
+использованию. Панель управления стремится к повседневной привычности
+таблицы, а не к трению традиционной формы менеджера паролей.
 
-See `TZ_SecureVault.md` for the original specification this project started
-from, `THREAT_MODEL.md` for what CIPHERDEN does and does not protect
-against, and `SECURITY.md` for the security design principles and audit
-requirements.
+См. `TZ_SecureVault.md` — исходное техническое задание, с которого
+начался проект, `THREAT_MODEL.md` — от чего CIPHERDEN защищает, а от
+чего нет, и `SECURITY.md` — принципы проектирования безопасности и
+требования к аудиту.
 
-**Start here for full context:** [`PROJECT_MAP.md`](PROJECT_MAP.md) —
-architecture, every decision's rationale, current status, and a detailed
-usage walkthrough. Kept current with the code; read it before making
-changes, whether you're a human or an AI agent picking this project back up.
+**Начните отсюда для полного контекста:** [`PROJECT_MAP.md`](PROJECT_MAP.md) —
+архитектура, обоснование каждого решения, текущий статус и подробная
+инструкция по использованию. Поддерживается в актуальном состоянии
+вместе с кодом; читайте его перед внесением изменений, будь вы человек
+или ИИ-агент, подхватывающий этот проект.
 
-## Status
+## Статус
 
-**This section is a quick summary only — [`PROJECT_MAP.md`](PROJECT_MAP.md)
-is the one kept fully current; if the two ever disagree, trust that file.**
+**Этот раздел — только краткая сводка — [`PROJECT_MAP.md`](PROJECT_MAP.md)
+поддерживается в полностью актуальном состоянии; если они когда-либо
+разойдутся, доверяйте тому файлу.**
 
-MVP (spec §4.1) is complete and working, and the project has grown well
-past it:
+MVP (ТЗ §4.1) полностью готов и работает, а проект вырос далеко за его
+рамки:
 
-- [x] `vault-core`: Argon2id KDF + SQLCipher/AES-256-GCM-backed storage
-      core (create/open/CRUD/search/backup), zero UI dependencies, fully
-      tested (74 tests). Sidecar key/metadata files write atomically
-      (temp file + fsync + rename), so an interrupted write (e.g. the
-      drive is yanked mid-save) can't corrupt them.
-- [x] **Shell + zones architecture**: one encrypted Shell file on disk,
-      holding independent, separately-password-protected zones —
-      **Accounts**, **Files**, **Seeds**, **Ledger/"Баланс"** — reached
-      through a desktop-style icon launcher, not tabs. True
-      existence-hiding: nothing about which zones exist is visible
-      without the Shell password.
-- [x] Shell password recovery (primary + optional recovery slot) and
-      `VaultKey` memory hardening (`mlock`/`VirtualLock`).
-- [x] **Two selectable UI themes** — Cyberpunk (original) and Signal
-      (brass/copper, an ambient particle-network canvas, an unlock
-      flourish), switchable from the lock screen; a known-shells
-      convenience list; native OS file/folder pickers throughout.
-- [x] **System dashboard** — a read-only, password-free status screen
-      (crypto status per zone, disk/process stats, failed-unlock-attempt
-      counts, no fabricated "AI" indicators).
-- [x] Import from CSV (e.g. a Google Sheets export) and KeePass `.kdbx`;
-      export selected rows to CSV; an opt-in single-zone standalone-file
-      export safety valve.
-- [x] CI (GitHub Actions): fmt/clippy/build/test on macOS, Linux, Windows,
-      plus a supply-chain-security job (`cargo-audit` + `cargo-deny`).
-- [x] Portable binary — verified to run standalone from any directory with
-      no files alongside it (frontend is embedded in the binary).
-- [x] **Real cross-platform portable builds** for macOS, Windows, and
-      Linux (a GitHub Actions release pipeline, since Tauri needs a
-      native build per OS), deployed together on one ExFAT SSD — no
-      installer, no admin rights, nothing installed on the host machine.
-- [x] An emergency quick-exit (button + Ctrl+Shift+X): instantly clears
-      all in-memory session/key material and quits, no confirmation, for
-      the moment the drive needs to come out right now.
+- [x] `vault-core`: KDF Argon2id + ядро хранения на SQLCipher/AES-256-GCM
+      (создание/открытие/CRUD/поиск/резервное копирование), без
+      UI-зависимостей, полностью протестировано (76 тестов). Сопутствующие
+      файлы ключа/метаданных пишутся атомарно (временный файл + fsync +
+      переименование), так что прерванная запись (например, накопитель
+      выдернули посреди сохранения) не может их повредить.
+- [x] **Архитектура «Оболочка + разделы»**: один зашифрованный файл
+      оболочки на диске, содержащий независимые, отдельно защищённые
+      паролем разделы — **Аккаунты**, **Файлы**, **Seed**,
+      **Баланс/«Ledger»** — доступные через рабочий стол с иконками, а не
+      вкладки. Настоящее скрытие существования: ничто о том, какие
+      разделы существуют, не видно без пароля оболочки.
+- [x] Восстановление пароля оболочки (основной + опциональный резервный
+      слот) и усиление памяти для `VaultKey` (`mlock`/`VirtualLock`).
+- [x] **Две выбираемые темы интерфейса** — Cyberpunk (оригинальная) и
+      Signal (латунь/медь, фон с сетью частиц, анимация разблокировки),
+      переключаемые с экрана блокировки; список известных хранилищ;
+      нативные системные диалоги выбора файлов/папок повсюду.
+- [x] **Системная панель** — экран статуса, только для чтения, без
+      пароля (статус шифрования по каждому разделу, статистика
+      диска/процесса, счётчики неудачных попыток входа, никаких
+      выдуманных «ИИ»-индикаторов).
+- [x] Импорт из CSV (например, экспорт из Google Sheets) и KeePass
+      `.kdbx`; экспорт выбранных строк в CSV; опциональный
+      предохранительный клапан экспорта отдельного раздела в
+      самостоятельный файл.
+- [x] CI (GitHub Actions): fmt/clippy/сборка/тесты на macOS, Linux,
+      Windows, плюс задача проверки безопасности цепочки поставок
+      (`cargo-audit` + `cargo-deny`).
+- [x] Портативный бинарник — проверено, что запускается самостоятельно
+      из любой директории без сопутствующих файлов (фронтенд встроен в
+      бинарник).
+- [x] **Настоящие кроссплатформенные портативные сборки** для macOS,
+      Windows и Linux (конвейер релизов на GitHub Actions, поскольку
+      Tauri требует нативной сборки под каждую ОС), развёрнутые вместе
+      на одном SSD с ExFAT — без установщика, без прав администратора,
+      ничего не устанавливается на хост-машину.
+- [x] Экстренный выход (кнопка + Ctrl+Shift+X): мгновенно очищает весь
+      сеансовый/ключевой материал в памяти и завершает работу, без
+      подтверждения, для момента, когда накопитель нужно вынуть прямо
+      сейчас.
 
-SSH/Tailscale launcher, hidden-volume/duress protection, and hardware 2FA
-(YubiKey) remain explicitly parked/deferred — see `THREAT_MODEL.md` and
-`PROJECT_MAP.md` §2 for why.
+Лаунчер SSH/Tailscale, защита от принуждения на основе скрытого тома и
+аппаратная 2FA (YubiKey) остаются явно отложенными — см.
+`THREAT_MODEL.md` и `PROJECT_MAP.md` §2 о причинах.
 
-## Why the crypto core came first
+## Почему криптографическое ядро было сделано первым
 
-Per the original spec's instructions to the implementing agent: no custom
-cryptographic primitives, ever — only vetted libraries — and the crypto core
-gets tests before anything else gets built on top of it. Concretely:
+Согласно указаниям исходного ТЗ для реализующего агента: никакой
+самодельной криптографии, никогда — только проверенные библиотеки — и
+криптографическое ядро получает тесты раньше, чем поверх него будет
+что-либо построено. Конкретно:
 
-- **KDF**: Argon2id via RustCrypto's `argon2` crate, tuned to 256 MiB / 3
-  passes / 4-way parallelism by default (`Argon2Params::standard()`).
-- **Storage**: SQLCipher (AES-256, per-page HMAC-authenticated) via
-  `rusqlite`'s `bundled-sqlcipher-vendored-openssl` feature — no separate
-  container format (VeraCrypt-style) is implemented; SQLCipher's own
-  encrypted file *is* the container, and it bundles its own OpenSSL so it
-  never depends on whatever (if anything) is installed on the host.
-- **Import/export**: CSV via the `csv` crate; KeePass `.kdbx` via the
-  `keepass` crate. Both only ever read/write already-vetted formats.
-- The master password itself never touches disk; only the derived key does,
-  held in memory in a type that zeroizes on drop.
+- **KDF**: Argon2id через крейт RustCrypto `argon2`, по умолчанию
+  настроенный на 256 МиБ / 3 прохода / 4-кратный параллелизм
+  (`Argon2Params::standard()`).
+- **Хранение**: SQLCipher (AES-256, аутентификация каждой страницы через
+  HMAC) через фичу `bundled-sqlcipher-vendored-openssl` крейта
+  `rusqlite` — отдельный формат контейнера (в стиле VeraCrypt) не
+  реализован; сам зашифрованный файл SQLCipher *и есть* контейнер, и он
+  включает собственный OpenSSL, поэтому никогда не зависит от того, что
+  (если вообще что-то) установлено на хосте.
+- **Импорт/экспорт**: CSV через крейт `csv`; KeePass `.kdbx` через крейт
+  `keepass`. Оба только читают/пишут уже проверенные форматы.
+- Сам мастер-пароль никогда не касается диска; только производный ключ,
+  хранящийся в памяти в типе, который обнуляется при уничтожении.
 
-Run the tests:
+Запустить тесты:
 
 ```sh
 cargo test --workspace
 ```
 
-Run the app:
+Запустить приложение:
 
 ```sh
 cargo build --workspace && ./target/debug/cipherden
 ```
 
-## Frontend: hand-written, no bundler
+## Фронтенд: написан вручную, без сборщика
 
-This environment's `npm`/Node networking cannot reach `registry.npmjs.org`
-(connection reset on every request — `cargo`/crates.io is unaffected, so
-this looks like a Node-specific quirk in this sandbox rather than a real
-firewall). Rather than block on that, the dashboard (`dist/`) is plain
-HTML/CSS/JS with no build step, served by Tauri directly. This turned out to
-be a good fit for the project's own goals anyway: fewer dependencies, and
-Tauri embeds it straight into the compiled binary, which is exactly the
-"one portable file" the spec asks for.
+Сетевой стек `npm`/Node в этом окружении не может достучаться до
+`registry.npmjs.org` (сброс соединения при каждом запросе — `cargo`/
+crates.io при этом не страдают, так что похоже на особенность именно
+Node в этой песочнице, а не на настоящий файрвол). Вместо того чтобы
+упираться в это, панель управления (`dist/`) — это простой HTML/CSS/JS
+без шага сборки, отдаваемый напрямую Tauri. Это оказалось хорошим
+решением и для собственных целей проекта: меньше зависимостей, и Tauri
+встраивает всё прямо в скомпилированный бинарник, что и есть тот самый
+«один портативный файл», которого требует ТЗ.
 
-## Vision: beyond a password manager
+## Видение: больше, чем менеджер паролей
 
-The plan is for CIPHERDEN to grow from a single vault into a small set of
-independent, equally-encrypted **zones** living side by side on the same
-drive — a personal, portable security toolkit rather than a single-purpose
-app. Concretely, planned zones:
+План состоит в том, чтобы CIPHERDEN вырос из единого хранилища в
+небольшой набор независимых, одинаково зашифрованных **разделов**,
+живущих бок о бок на одном накопителе — личный портативный набор
+инструментов безопасности, а не приложение с единственным назначением.
+Конкретно, запланированные разделы:
 
-- **Accounts** (done) — logins, passwords, notes.
-- **Files** (done) — an encrypted file safe, added/extracted through the
-  app's own UI via native OS file pickers (no OS-level mount, so it stays
-  driver-free and just as portable as the accounts vault). Each file is
-  stored as a blob in its own SQLCipher container (`files.vault`) —
-  comfortable for documents/photos; very large files (many GB) would want a
-  streaming approach instead, not attempted yet.
-- **Seed phrases** — a separate, explicitly-labeled zone with its own
-  warnings; hardware wallets are still recommended as the primary option.
-  Not started.
-- SSH/Tailscale launcher and disk-cloning/network scripts: deliberately
-  parked, not planned right now — noted here only as context for the
-  "zones" architecture, not a commitment.
-- Further out, more speculative: eventually AI-assisted features.
+- **Аккаунты** (готово) — логины, пароли, заметки.
+- **Файлы** (готово) — зашифрованный файловый сейф, добавление/
+  извлечение через собственный интерфейс приложения через нативные
+  системные диалоги выбора файлов (без монтирования на уровне ОС, так
+  что остаётся без драйверов и таким же портативным, как хранилище
+  аккаунтов). Каждый файл хранится как blob в собственном контейнере
+  SQLCipher (`files.vault`) — комфортно для документов/фото; очень
+  крупные файлы (много гигабайт) потребовали бы потокового подхода
+  вместо этого, пока не реализовано.
+- **Seed-фразы** — отдельный, явно помеченный раздел со своими
+  предупреждениями; аппаратные кошельки всё ещё рекомендуются как
+  основной вариант. Не начато.
+- Лаунчер SSH/Tailscale и скрипты клонирования диска/работы с сетью:
+  осознанно отложены, сейчас не планируются — упомянуты здесь только
+  как контекст для архитектуры «разделов», не как обязательство.
+- Ещё дальше, более гипотетически: со временем функции с участием ИИ.
 
-Shared implementation detail: `crates/vault-core/src/container.rs` holds
-the create/open/keying logic every zone reuses, so a fix or audit finding
-there covers all zones at once, not one at a time.
+Общая деталь реализации: `crates/vault-core/src/container.rs` содержит
+логику создания/открытия/ключевания, которую переиспользует каждый
+раздел, так что исправление или находка аудита там покрывает все
+разделы разом, а не по одному.
 
-**Architecture decision:** zones are separate encrypted container files
-(like today's `.db` + `.meta.json` pair) sitting on one ordinary exFAT
-partition — not separate raw disk partitions. exFAT is the one filesystem
-that's natively readable/writable on Windows, macOS, and Linux with zero
-drivers; carving up the drive into real partitions would require installing
-mount drivers on every host machine, which breaks the "plug in and it just
-works" promise this project is built around.
+**Архитектурное решение:** разделы — это отдельные зашифрованные
+файлы-контейнеры (как сегодняшняя пара `.db` + `.meta.json`),
+лежащие на одном обычном разделе exFAT — не отдельные настоящие разделы
+диска. exFAT — единственная файловая система, нативно читаемая/
+записываемая на Windows, macOS и Linux без драйверов; нарезка
+накопителя на настоящие разделы диска потребовала бы установки
+драйверов монтирования на каждой хост-машине, что нарушает обещание
+«подключил и сразу работает», на котором построен этот проект.
 
-Hidden-volume-style duress protection and hardware second-factor (YubiKey)
-remain explicitly deferred — see `THREAT_MODEL.md` — until they can be
-built and verified properly rather than half-implemented.
+Защита от принуждения в стиле скрытого тома и аппаратный второй фактор
+(YubiKey) остаются явно отложенными — см. `THREAT_MODEL.md` — пока их
+не удастся построить и как следует проверить, а не реализовать
+наполовину.
 
-## Layout
+## Структура
 
 ```
-Cargo.toml              workspace root
-crates/vault-core/      encryption + storage core (Argon2id, SQLCipher, import/export)
-src-tauri/              Tauri desktop shell (IPC commands, auto-lock, clipboard policy)
-dist/                   hand-written frontend (no bundler)
-TZ_SecureVault.md       original specification
+Cargo.toml              корень workspace
+crates/vault-core/      ядро шифрования и хранения (Argon2id, SQLCipher, импорт/экспорт)
+src-tauri/              десктопная оболочка Tauri (IPC-команды, авто-блокировка, политика буфера обмена)
+dist/                   фронтенд, написанный вручную (без сборщика)
+TZ_SecureVault.md       исходное техническое задание
 THREAT_MODEL.md
 SECURITY.md
 ```
