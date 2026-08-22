@@ -20,7 +20,11 @@
 
     <div class="field">
       <label class="field-label" for="shell-path">Путь к оболочке</label>
-      <input id="shell-path" type="text" placeholder="./vault/shell.vault" value="./vault/shell.vault" />
+      <div class="row">
+        <input id="shell-path" type="text" placeholder="Например: /Volumes/MySSD/shell.vault" />
+        <button id="btn-shell-browse-open" type="button" class="ghost small" title="Выбрать существующий файл оболочки">📂</button>
+        <button id="btn-shell-browse-new" type="button" class="ghost small" title="Выбрать папку для новой оболочки">📁</button>
+      </div>
     </div>
     <div class="field">
       <label class="field-label" for="shell-password">Пароль</label>

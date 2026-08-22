@@ -194,9 +194,28 @@ function updateRecoveryUi() {
 recoveryCheckbox.addEventListener("change", updateRecoveryUi);
 updateRecoveryUi();
 
+document.getElementById("btn-shell-browse-open").addEventListener("click", async () => {
+  const path = await dialog.open({
+    title: "Выберите файл оболочки",
+    filters: [{ name: "CIPHERDEN vault", extensions: ["vault"] }],
+  });
+  if (path) document.getElementById("shell-path").value = path;
+});
+
+document.getElementById("btn-shell-browse-new").addEventListener("click", async () => {
+  const dir = await dialog.open({ directory: true, title: "Куда сохранить новую оболочку" });
+  if (!dir) return;
+  const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
+  document.getElementById("shell-path").value = `${dir}${sep}shell.vault`;
+});
+
 document.getElementById("btn-shell-open").addEventListener("click", async () => {
   const path = document.getElementById("shell-path").value.trim();
   const password = document.getElementById("shell-password").value;
+  if (!path) {
+    lockError.textContent = "Укажите путь к оболочке (кнопка 📂) или введите его вручную.";
+    return;
+  }
   try {
     await invoke("open_shell", { path, password });
     showDesktop();
@@ -211,6 +230,10 @@ document.getElementById("btn-shell-create").addEventListener("click", async () =
   const addRecovery = recoveryCheckbox.checked;
   const recoveryPassword = addRecovery ? document.getElementById("shell-recovery-password").value : null;
 
+  if (!path) {
+    lockError.textContent = "Укажите, где создать оболочку (кнопка 📁) или введите путь вручную.";
+    return;
+  }
   if (primaryPassword.length < 8) {
     lockError.textContent = "Пароль должен быть не короче 8 символов.";
     return;
