@@ -392,6 +392,7 @@ const lockScreen = document.getElementById("lock-screen");
 const desktop = document.getElementById("desktop");
 const zoneView = document.getElementById("zone-view");
 const systemView = document.getElementById("system-view");
+const emergencyExitBtn = document.getElementById("btn-emergency-exit");
 const lockError = document.getElementById("lock-error");
 let systemStatusInterval = null;
 
@@ -430,6 +431,7 @@ setInterval(() => {
 // overlap/jump risk from having two full-height sections in flow together.
 function switchScreen(hideEls, showEl) {
   hideEls = Array.isArray(hideEls) ? hideEls : [hideEls];
+  emergencyExitBtn.classList.toggle("hidden", showEl === lockScreen);
   if (!isSignalTheme()) {
     hideEls.forEach((el) => el.classList.add("hidden"));
     showEl.classList.remove("hidden");
@@ -590,6 +592,23 @@ document.getElementById("btn-zone-back").addEventListener("click", showDesktop);
 document.getElementById("btn-shell-lock").addEventListener("click", async () => {
   await invoke("lock_shell");
   showLockScreen();
+});
+
+// Emergency quick-exit: no confirmation dialog by design -- the whole
+// point is a single instant action for the moment the drive needs to come
+// out right now. invoke() fires the request but the backend calls
+// std::process::exit(0) before any reply can come back, so the app window
+// just disappears; nothing after this call is expected to run.
+function triggerEmergencyExit() {
+  if (emergencyExitBtn.classList.contains("hidden")) return;
+  invoke("emergency_exit").catch(() => {});
+}
+emergencyExitBtn.addEventListener("click", triggerEmergencyExit);
+window.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.shiftKey && (e.key === "X" || e.key === "x")) {
+    e.preventDefault();
+    triggerEmergencyExit();
+  }
 });
 
 document.getElementById("btn-zone-lock").addEventListener("click", async () => {

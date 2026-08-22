@@ -305,6 +305,25 @@ fn is_shell_unlocked(state: State<'_, ShellState>) -> Result<bool, String> {
     Ok(guard.open.is_some())
 }
 
+/// Emergency quick-exit: same as `lock_shell` (clear every open zone
+/// session and drop the Shell key from memory) and then terminate the
+/// whole process immediately, for the moment the drive needs to be pulled
+/// right now with no time for a normal shutdown. There is nothing to flush
+/// first — every mutating zone command already persists synchronously via
+/// SQLite's own atomic commit, so no data is buffered in memory waiting to
+/// be saved.
+#[tauri::command]
+fn emergency_exit(shell: State<'_, ShellState>, sessions: State<'_, SessionsState>) {
+    if let Ok(mut sessions) = sessions.lock() {
+        sessions.clear();
+    }
+    if let Ok(mut guard) = shell.lock() {
+        guard.open = None;
+        guard.open_path = None;
+    }
+    std::process::exit(0);
+}
+
 // --- System zone: a read-only security/status dashboard --------------------
 //
 // Everything here is either a real, directly-measured number (file size,
@@ -1074,6 +1093,7 @@ fn main() {
             change_shell_password,
             lock_shell,
             is_shell_unlocked,
+            emergency_exit,
             get_system_status,
             export_shell_backup,
             export_zone_standalone,

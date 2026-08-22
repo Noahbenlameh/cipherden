@@ -49,7 +49,7 @@ impl VaultMeta {
 
     pub fn save(&self, path: &Path) -> Result<()> {
         let data = serde_json::to_string_pretty(self)?;
-        fs::write(path, data)?;
+        crate::atomic_write(path, data.as_bytes())?;
         Ok(())
     }
 }
