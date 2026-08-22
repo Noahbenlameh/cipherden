@@ -836,15 +836,22 @@ async function refreshZones() {
     const el = document.createElement("div");
     el.className = "file-icon" + (unlocked ? "" : " zone-locked");
     el.innerHTML = `
-      <span class="glyph">${zoneGlyphMarkup(zone.kind)}</span>
-      ${unlocked ? "" : '<span class="lock-badge">🔒</span>'}
+      <span class="glyph-wrap">
+        <span class="glyph">${zoneGlyphMarkup(zone.kind)}</span>
+        ${unlocked ? "" : '<span class="lock-badge">🔒</span>'}
+      </span>
       <span class="label">${escapeHtml(zone.label)}</span>
       <div class="icon-actions">
+        <button type="button" class="ghost password-zone-btn" title="Сменить пароль раздела">🔑</button>
         <button type="button" class="ghost export-zone-btn" title="Экспортировать как отдельный файл">⇩</button>
         <button type="button" class="danger delete-zone-btn" title="Удалить раздел">✕</button>
       </div>
     `;
     el.addEventListener("click", () => openZoneFromDesktop(zone, unlocked));
+    el.querySelector(".password-zone-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      openZonePasswordModal(zone);
+    });
     el.querySelector(".export-zone-btn").addEventListener("click", async (e) => {
       e.stopPropagation();
       await exportZoneStandalone(zone);
@@ -904,6 +911,40 @@ async function exportZoneStandalone(zone) {
     setDesktopStatus("Ошибка экспорта: " + e);
   }
 }
+
+// --- Change a zone's own password (independent of the Shell's) -----------
+
+let zonePasswordTarget = null;
+
+function openZonePasswordModal(zone) {
+  zonePasswordTarget = zone;
+  document.getElementById("zone-password-modal-title").textContent = `Смена пароля раздела «${zone.label}»`;
+  document.getElementById("zp-old").value = "";
+  document.getElementById("zp-new").value = "";
+  document.getElementById("zone-password-error").textContent = "";
+  document.getElementById("zone-password-modal").classList.remove("hidden");
+}
+
+document.getElementById("btn-zone-password-cancel").addEventListener("click", () => {
+  document.getElementById("zone-password-modal").classList.add("hidden");
+});
+
+document.getElementById("btn-zone-password-submit").addEventListener("click", async () => {
+  const oldPassword = document.getElementById("zp-old").value;
+  const newPassword = document.getElementById("zp-new").value;
+  const errorEl = document.getElementById("zone-password-error");
+  if (newPassword.length < 8) { errorEl.textContent = "Новый пароль должен быть не короче 8 символов."; return; }
+  if (newPassword === oldPassword) { errorEl.textContent = "Новый пароль должен отличаться от текущего."; return; }
+
+  try {
+    await invoke("change_zone_password", { zoneId: zonePasswordTarget.id, oldPassword, newPassword });
+    document.getElementById("zone-password-modal").classList.add("hidden");
+    setDesktopStatus(`Пароль раздела «${zonePasswordTarget.label}» изменён. Раздел заблокирован — войдите новым паролем.`);
+    refreshZones();
+  } catch (e) {
+    errorEl.textContent = String(e);
+  }
+});
 
 async function openZoneFromDesktop(zone, alreadyUnlocked) {
   if (alreadyUnlocked) {

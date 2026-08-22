@@ -443,6 +443,49 @@ impl Shell {
         Ok(kind.as_str())
     }
 
+    /// Change zone `zone_id`'s own password (independent of the Shell's),
+    /// authenticated by its *current* zone password — unlike the Shell,
+    /// a zone has exactly one password and no recovery slot, so there is
+    /// no "any currently-valid password" flow here: `old_password` must be
+    /// the one real password. Decrypts with it, re-derives a fresh
+    /// Argon2id key (new random salt) from `new_password`, and re-encrypts
+    /// the zone's serialized bytes under that new key — the zone's actual
+    /// data never changes, only what unlocks it.
+    pub fn change_zone_password(
+        &self,
+        zone_id: i64,
+        old_password: &str,
+        new_password: &str,
+        params: Argon2Params,
+    ) -> Result<()> {
+        let (_kind, conn, _old_key) = self.open_zone_raw(zone_id, old_password)?;
+        let plaintext = container::serialize_to_bytes(&conn)?;
+        drop(conn);
+
+        let salt = crate::kdf::random_salt();
+        let new_key = crate::kdf::derive_key(new_password.as_bytes(), &salt, params)?;
+        let blob = container::encrypt_blob(&new_key, &plaintext);
+
+        let now = now_rfc3339();
+        let changed = self.conn.execute(
+            "UPDATE zones SET blob = ?1, kdf_salt = ?2, kdf_m_cost_kib = ?3, kdf_t_cost = ?4,
+             kdf_p_cost = ?5, updated_at = ?6 WHERE id = ?7",
+            rusqlite::params![
+                blob,
+                salt.as_slice(),
+                params.m_cost_kib,
+                params.t_cost,
+                params.p_cost,
+                now,
+                zone_id,
+            ],
+        )?;
+        if changed == 0 {
+            return Err(VaultError::EntryNotFound(zone_id));
+        }
+        Ok(())
+    }
+
     /// Persist a zone's current in-memory state back into the Shell — call
     /// this after any mutation made through the returned `OpenZone`.
     pub fn save_zone(&self, zone_id: i64, zone: &OpenZone) -> Result<()> {

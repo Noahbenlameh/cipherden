@@ -520,6 +520,39 @@ fn delete_zone(
     Ok(())
 }
 
+/// Change zone `zone_id`'s own password. Always evicts any currently-open
+/// session for this zone afterward, even mid-way through — the live
+/// session's `OpenZone` still holds the *old* key baked in, and letting a
+/// later `save_zone` from that stale session re-encrypt with it while the
+/// zones-table row now carries the new salt/params would silently brick
+/// the zone (wrong key vs. what the row says to derive). Forcing a
+/// re-open with the new password is the only safe option, same principle
+/// as `delete_zone` already evicting a session for a zone that's gone.
+#[tauri::command]
+fn change_zone_password(
+    shell: State<'_, ShellState>,
+    sessions: State<'_, SessionsState>,
+    zone_id: i64,
+    old_password: String,
+    new_password: String,
+) -> Result<(), String> {
+    let mut guard = shell.lock().map_err(to_err)?;
+    guard.last_activity = Instant::now();
+    let shell_ref = guard.open.as_ref().ok_or("shell is locked")?;
+    shell_ref
+        .change_zone_password(
+            zone_id,
+            &old_password,
+            &new_password,
+            Argon2Params::standard(),
+        )
+        .map_err(to_err)?;
+    // Only evict on success -- a failed attempt (e.g. wrong old password)
+    // changed nothing, so any existing session is still perfectly valid.
+    sessions.lock().map_err(to_err)?.remove(&zone_id);
+    Ok(())
+}
+
 #[tauri::command]
 fn open_zone(
     shell: State<'_, ShellState>,
@@ -1039,7 +1072,8 @@ fn add_transaction(
         _ => None,
     };
     with_ledger_zone(&sessions, &shell, zone_id, true, |v| {
-        v.add_transaction(amount_cents, &comment, date).map_err(to_err)
+        v.add_transaction(amount_cents, &comment, date)
+            .map_err(to_err)
     })
 }
 
@@ -1128,6 +1162,7 @@ fn main() {
             create_zone,
             rename_zone,
             delete_zone,
+            change_zone_password,
             open_zone,
             lock_zone,
             is_zone_unlocked,

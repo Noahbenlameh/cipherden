@@ -90,7 +90,10 @@ mod atomic_write_tests {
             .filter_map(|e| e.ok())
             .filter(|e| e.file_name().to_string_lossy().contains(".tmp-"))
             .collect();
-        assert!(leftovers.is_empty(), "temp file was not cleaned up by rename");
+        assert!(
+            leftovers.is_empty(),
+            "temp file was not cleaned up by rename"
+        );
     }
 
     #[test]
@@ -103,7 +106,9 @@ mod atomic_write_tests {
         let path = dir.path().join("meta.json");
         std::fs::write(&path, b"original-good-data").unwrap();
 
-        let tmp_path = dir.path().join(format!(".meta.json.tmp-{}", std::process::id()));
+        let tmp_path = dir
+            .path()
+            .join(format!(".meta.json.tmp-{}", std::process::id()));
         std::fs::write(&tmp_path, b"truncated-garb").unwrap();
         // Deliberately no rename() here -- that's the "yanked before commit" case.
 

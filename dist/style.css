@@ -635,10 +635,11 @@ button.small { padding: 8px 10px; font-size: 13px; }
 
 .file-icon.zone-locked .glyph { opacity: 0.45; filter: none; }
 .file-icon.zone-locked .label { color: var(--muted); }
+.file-icon .glyph-wrap { position: relative; display: inline-flex; }
 .file-icon .lock-badge {
   position: absolute;
-  bottom: 26px;
-  right: 12px;
+  bottom: -4px;
+  right: -8px;
   font-size: 12px;
 }
 .confirm-message { margin: 0 0 4px; font-size: 14px; line-height: 1.5; }

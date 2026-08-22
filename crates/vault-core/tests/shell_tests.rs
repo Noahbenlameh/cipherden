@@ -85,6 +85,82 @@ fn create_zone_open_mutate_save_reopen_roundtrip() {
 }
 
 #[test]
+fn change_zone_password_preserves_data_and_rejects_the_old_password() {
+    let dir = tempfile::tempdir().unwrap();
+    let shell_path = dir.path().join("shell.vault");
+    let shell = Shell::create(&shell_path, "shell-pw", None, test_params()).unwrap();
+
+    let zone_id = shell
+        .create_zone(
+            ZoneKind::Accounts,
+            "My Accounts",
+            "🔑",
+            "old-zone-pw",
+            test_params(),
+        )
+        .unwrap();
+    {
+        let OpenZone::Accounts(vault) = shell.open_zone(zone_id, "old-zone-pw").unwrap() else {
+            panic!("expected Accounts zone");
+        };
+        vault
+            .add_entry(&NewEntry {
+                title: "GitHub".into(),
+                username: "alice".into(),
+                password: "hunter2".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        shell
+            .save_zone(zone_id, &OpenZone::Accounts(vault))
+            .unwrap();
+    }
+
+    shell
+        .change_zone_password(zone_id, "old-zone-pw", "new-zone-pw", test_params())
+        .unwrap();
+
+    // Old password no longer works.
+    match shell.open_zone(zone_id, "old-zone-pw") {
+        Err(VaultError::InvalidPassword) => {}
+        _ => panic!("expected the old zone password to be rejected"),
+    }
+
+    // New password opens it, and the data is untouched.
+    let OpenZone::Accounts(vault) = shell.open_zone(zone_id, "new-zone-pw").unwrap() else {
+        panic!("expected Accounts zone");
+    };
+    let entries = vault.list_entries().unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].title, "GitHub");
+    assert_eq!(entries[0].password, "hunter2");
+}
+
+#[test]
+fn change_zone_password_requires_the_correct_old_password() {
+    let dir = tempfile::tempdir().unwrap();
+    let shell_path = dir.path().join("shell.vault");
+    let shell = Shell::create(&shell_path, "shell-pw", None, test_params()).unwrap();
+    let zone_id = shell
+        .create_zone(
+            ZoneKind::Accounts,
+            "My Accounts",
+            "🔑",
+            "real-pw",
+            test_params(),
+        )
+        .unwrap();
+
+    match shell.change_zone_password(zone_id, "wrong-pw", "new-pw", test_params()) {
+        Err(VaultError::InvalidPassword) => {}
+        _ => panic!("expected InvalidPassword"),
+    }
+
+    // The zone is unaffected -- the real password still works.
+    assert!(shell.open_zone(zone_id, "real-pw").is_ok());
+}
+
+#[test]
 fn files_zone_round_trips_through_shell() {
     let dir = tempfile::tempdir().unwrap();
     let shell = Shell::create(

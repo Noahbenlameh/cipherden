@@ -31,7 +31,9 @@ fn add_transaction_honors_an_explicit_date() {
     let dir = tempfile::tempdir().unwrap();
     let vault = LedgerVault::create(dir.path().join("ledger.vault"), "pw", test_params()).unwrap();
 
-    vault.add_transaction(1_000, "old paper record", Some("2019-03-14")).unwrap();
+    vault
+        .add_transaction(1_000, "old paper record", Some("2019-03-14"))
+        .unwrap();
     vault.add_transaction(2_000, "today", None).unwrap();
 
     let txs = vault.list_transactions().unwrap();
