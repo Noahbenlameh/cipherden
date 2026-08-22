@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 // CIPHERDEN desktop shell. All cryptography and storage logic lives in
 // `vault-core`; this crate only wires that core to Tauri IPC commands and
 // enforces the app-level policies the spec requires (auto-lock, clipboard
