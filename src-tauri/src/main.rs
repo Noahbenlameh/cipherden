@@ -13,21 +13,22 @@
 // `mutate = true`), so there is no separate "save" step and no window
 // where a crash could lose data that isn't also lost by SQLite itself.
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::collections::{HashMap, VecDeque};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use rand::Rng;
 use serde::Serialize;
+use sysinfo::{Disks, ProcessesToUpdate, System as Sysinfo};
 use tauri::State;
 use vault_core::files::{FileMeta, Folder};
 use vault_core::shell::{OpenZone, ZoneKind, ZoneMeta};
 use vault_core::store::{Entry, NewEntry};
 use vault_core::{
     import, Argon2Params, FileVault, LedgerVault, NewSeedEntry, SeedEntry, SeedVault, Shell,
-    Transaction, Vault,
+    Transaction, Vault, VaultError,
 };
 
 const AUTO_LOCK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
@@ -42,6 +43,10 @@ fn to_err(e: impl std::fmt::Display) -> String {
 
 struct ShellSlot {
     open: Option<Shell>,
+    // Tracked purely so the read-only System zone can report the Shell
+    // file's size and free disk space — never used for anything
+    // authentication-related.
+    open_path: Option<PathBuf>,
     last_activity: Instant,
 }
 
@@ -49,12 +54,56 @@ impl ShellSlot {
     fn new() -> Self {
         Self {
             open: None,
+            open_path: None,
             last_activity: Instant::now(),
         }
     }
 }
 
 type ShellState = Arc<Mutex<ShellSlot>>;
+
+// --- Failed-unlock-attempt tracking (for the System zone's HUD only) -------
+//
+// In-memory only — resets on process restart, never written to disk. Counts
+// strictly VaultError::InvalidPassword responses from open_shell, never a
+// bad path/IO error, so it reflects real wrong-password attempts and
+// nothing else.
+struct AttemptLog {
+    total_failed: u32,
+    recent: VecDeque<Instant>,
+}
+
+const ATTEMPT_RECENT_WINDOW: Duration = Duration::from_secs(5 * 60);
+
+impl AttemptLog {
+    fn new() -> Self {
+        Self {
+            total_failed: 0,
+            recent: VecDeque::new(),
+        }
+    }
+    fn record_failure(&mut self) {
+        self.total_failed += 1;
+        self.recent.push_back(Instant::now());
+        self.prune();
+    }
+    fn prune(&mut self) {
+        while let Some(&front) = self.recent.front() {
+            if front.elapsed() > ATTEMPT_RECENT_WINDOW {
+                self.recent.pop_front();
+            } else {
+                break;
+            }
+        }
+    }
+    fn recent_count(&mut self) -> u32 {
+        self.prune();
+        self.recent.len() as u32
+    }
+}
+
+type AttemptsState = Arc<Mutex<AttemptLog>>;
+type SysState = Arc<Mutex<Sysinfo>>;
 
 struct ZoneSession {
     zone: OpenZone,
@@ -161,8 +210,9 @@ fn create_shell(
     primary_password: String,
     recovery_password: Option<String>,
 ) -> Result<(), String> {
+    let path_buf = PathBuf::from(&path);
     let shell = Shell::create(
-        PathBuf::from(path),
+        path_buf.clone(),
         &primary_password,
         recovery_password.as_deref(),
         Argon2Params::standard(),
@@ -170,17 +220,36 @@ fn create_shell(
     .map_err(to_err)?;
     let mut guard = state.lock().map_err(to_err)?;
     guard.open = Some(shell);
+    guard.open_path = Some(path_buf);
     guard.last_activity = Instant::now();
     Ok(())
 }
 
 #[tauri::command]
-fn open_shell(state: State<'_, ShellState>, path: String, password: String) -> Result<(), String> {
-    let shell = Shell::open(PathBuf::from(path), &password).map_err(to_err)?;
-    let mut guard = state.lock().map_err(to_err)?;
-    guard.open = Some(shell);
-    guard.last_activity = Instant::now();
-    Ok(())
+fn open_shell(
+    state: State<'_, ShellState>,
+    attempts: State<'_, AttemptsState>,
+    path: String,
+    password: String,
+) -> Result<(), String> {
+    let path_buf = PathBuf::from(&path);
+    match Shell::open(path_buf.clone(), &password) {
+        Ok(shell) => {
+            let mut guard = state.lock().map_err(to_err)?;
+            guard.open = Some(shell);
+            guard.open_path = Some(path_buf);
+            guard.last_activity = Instant::now();
+            Ok(())
+        }
+        Err(e) => {
+            if matches!(e, VaultError::InvalidPassword) {
+                if let Ok(mut log) = attempts.lock() {
+                    log.record_failure();
+                }
+            }
+            Err(to_err(e))
+        }
+    }
 }
 
 /// Set a new value for the primary or recovery password slot, authenticated
@@ -224,6 +293,7 @@ fn lock_shell(
     sessions.clear();
     let mut guard = shell.lock().map_err(to_err)?;
     guard.open = None;
+    guard.open_path = None;
     Ok(())
 }
 
@@ -231,6 +301,106 @@ fn lock_shell(
 fn is_shell_unlocked(state: State<'_, ShellState>) -> Result<bool, String> {
     let guard = state.lock().map_err(to_err)?;
     Ok(guard.open.is_some())
+}
+
+// --- System zone: a read-only security/status dashboard --------------------
+//
+// Everything here is either a real, directly-measured number (file size,
+// free disk space, this process's own RAM/CPU, a same-process failed-
+// attempt counter) or a static fact about the app's own crypto parameters.
+// Nothing here is fabricated, and nothing here is a control — nothing this
+// command's data feeds ever exposes a mutating action.
+
+#[derive(Serialize)]
+struct SystemStatus {
+    shell_open: bool,
+    shell_file_bytes: Option<u64>,
+    disk_free_bytes: Option<u64>,
+    disk_total_bytes: Option<u64>,
+    process_ram_bytes: u64,
+    process_cpu_percent: f32,
+    failed_attempts_total: u32,
+    failed_attempts_recent: u32,
+    attempt_window_seconds: u64,
+    argon2_m_cost_kib: u32,
+    argon2_t_cost: u32,
+    argon2_p_cost: u32,
+    auto_lock_seconds: u64,
+}
+
+/// Finds the disk whose mount point is the longest matching prefix of `dir`
+/// (so `/Volumes/MySSD/x` resolves to the `/Volumes/MySSD` volume, not `/`).
+fn disk_space_for(dir: &Path) -> (Option<u64>, Option<u64>) {
+    let disks = Disks::new_with_refreshed_list();
+    let mut best: Option<(&Path, u64, u64)> = None;
+    for disk in disks.list() {
+        let mp = disk.mount_point();
+        if dir.starts_with(mp) {
+            let is_better = best.map(|(b, _, _)| mp.as_os_str().len() > b.as_os_str().len());
+            if is_better.unwrap_or(true) {
+                best = Some((mp, disk.available_space(), disk.total_space()));
+            }
+        }
+    }
+    match best {
+        Some((_, free, total)) => (Some(free), Some(total)),
+        None => (None, None),
+    }
+}
+
+#[tauri::command]
+fn get_system_status(
+    shell: State<'_, ShellState>,
+    attempts: State<'_, AttemptsState>,
+    sys: State<'_, SysState>,
+) -> Result<SystemStatus, String> {
+    let (shell_open, shell_path) = {
+        let guard = shell.lock().map_err(to_err)?;
+        (guard.open.is_some(), guard.open_path.clone())
+    };
+
+    let shell_file_bytes = shell_path
+        .as_ref()
+        .and_then(|p| std::fs::metadata(p).ok())
+        .map(|m| m.len());
+
+    let (disk_free_bytes, disk_total_bytes) = shell_path
+        .as_ref()
+        .and_then(|p| p.parent())
+        .map(disk_space_for)
+        .unwrap_or((None, None));
+
+    let (process_ram_bytes, process_cpu_percent) = {
+        let pid = sysinfo::get_current_pid().map_err(|e| e.to_string())?;
+        let mut sys = sys.lock().map_err(to_err)?;
+        sys.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
+        sys.process(pid)
+            .map(|p| (p.memory(), p.cpu_usage()))
+            .unwrap_or((0, 0.0))
+    };
+
+    let (failed_attempts_total, failed_attempts_recent) = {
+        let mut log = attempts.lock().map_err(to_err)?;
+        (log.total_failed, log.recent_count())
+    };
+
+    let params = Argon2Params::standard();
+
+    Ok(SystemStatus {
+        shell_open,
+        shell_file_bytes,
+        disk_free_bytes,
+        disk_total_bytes,
+        process_ram_bytes,
+        process_cpu_percent,
+        failed_attempts_total,
+        failed_attempts_recent,
+        attempt_window_seconds: ATTEMPT_RECENT_WINDOW.as_secs(),
+        argon2_m_cost_kib: params.m_cost_kib,
+        argon2_t_cost: params.t_cost,
+        argon2_p_cost: params.p_cost,
+        auto_lock_seconds: AUTO_LOCK_TIMEOUT.as_secs(),
+    })
 }
 
 #[tauri::command]
@@ -855,6 +1025,8 @@ fn delete_transaction(
 fn main() {
     let shell_state: ShellState = Arc::new(Mutex::new(ShellSlot::new()));
     let sessions_state: SessionsState = Arc::new(Mutex::new(HashMap::new()));
+    let attempts_state: AttemptsState = Arc::new(Mutex::new(AttemptLog::new()));
+    let sys_state: SysState = Arc::new(Mutex::new(Sysinfo::new()));
 
     // Auto-lock watcher: force-locks the Shell (and, with it, every open
     // zone) after inactivity, and independently evicts any single zone
@@ -892,12 +1064,15 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(shell_state)
         .manage(sessions_state)
+        .manage(attempts_state)
+        .manage(sys_state)
         .invoke_handler(tauri::generate_handler![
             create_shell,
             open_shell,
             change_shell_password,
             lock_shell,
             is_shell_unlocked,
+            get_system_status,
             export_shell_backup,
             export_zone_standalone,
             list_zones,

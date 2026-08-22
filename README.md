@@ -20,28 +20,41 @@ changes, whether you're a human or an AI agent picking this project back up.
 
 ## Status
 
-MVP (spec §4.1) is complete and working:
+**This section is a quick summary only — [`PROJECT_MAP.md`](PROJECT_MAP.md)
+is the one kept fully current; if the two ever disagree, trust that file.**
 
-- [x] `vault-core`: Argon2id KDF + SQLCipher-backed entry store (create/
-      open/CRUD/search/backup), zero UI dependencies, fully tested.
-- [x] Tauri desktop shell + hand-written HTML/CSS/JS dashboard (table view,
-      search, category filter, password generator, clipboard auto-clear,
-      auto-lock).
+MVP (spec §4.1) is complete and working, and the project has grown well
+past it:
+
+- [x] `vault-core`: Argon2id KDF + SQLCipher/AES-256-GCM-backed storage
+      core (create/open/CRUD/search/backup), zero UI dependencies, fully
+      tested (71 tests).
+- [x] **Shell + zones architecture**: one encrypted Shell file on disk,
+      holding independent, separately-password-protected zones —
+      **Accounts**, **Files**, **Seeds**, **Ledger/"Баланс"** — reached
+      through a desktop-style icon launcher, not tabs. True
+      existence-hiding: nothing about which zones exist is visible
+      without the Shell password.
+- [x] Shell password recovery (primary + optional recovery slot) and
+      `VaultKey` memory hardening (`mlock`/`VirtualLock`).
+- [x] **Two selectable UI themes** — Cyberpunk (original) and Signal
+      (brass/copper, an ambient particle-network canvas, an unlock
+      flourish), switchable from the lock screen; a known-shells
+      convenience list; native OS file/folder pickers throughout.
+- [x] **System dashboard** — a read-only, password-free status screen
+      (crypto status per zone, disk/process stats, failed-unlock-attempt
+      counts, no fabricated "AI" indicators).
+- [x] Import from CSV (e.g. a Google Sheets export) and KeePass `.kdbx`;
+      export selected rows to CSV; an opt-in single-zone standalone-file
+      export safety valve.
+- [x] CI (GitHub Actions): fmt/clippy/build/test on macOS, Linux, Windows,
+      plus a supply-chain-security job (`cargo-audit` + `cargo-deny`).
 - [x] Portable binary — verified to run standalone from any directory with
       no files alongside it (frontend is embedded in the binary).
-- [x] Encrypted backup export.
-- [x] Import from CSV (e.g. a Google Sheets export) and KeePass `.kdbx`.
-- [x] Export selected rows to CSV.
-- [x] CI (GitHub Actions): fmt/clippy/build/test on macOS, Linux, Windows.
-- [x] Cyberpunk/HUD visual redesign.
-- [x] Native OS file/folder pickers everywhere a path used to be typed by
-      hand (`tauri-plugin-dialog`, itself just a Cargo dependency — no npm).
-- [x] Second zone: **Files** — an encrypted file safe (add/extract/delete,
-      independent password from the Accounts zone), reachable via the zone
-      tabs in the dashboard.
 
-Next up: more zones as the user requests them (seed phrases, etc.) — see
-**Vision** below. SSH/Tailscale launcher explicitly parked for now.
+SSH/Tailscale launcher, hidden-volume/duress protection, and hardware 2FA
+(YubiKey) remain explicitly parked/deferred — see `THREAT_MODEL.md` and
+`PROJECT_MAP.md` §2 for why.
 
 ## Why the crypto core came first
 

@@ -111,6 +111,46 @@ body::after {
 }
 
 .field { margin-bottom: 14px; }
+
+/* --- known shells (lock screen) --- */
+.known-shells { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.known-shell-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.known-shell-row:hover { border-color: var(--border-strong); background: var(--accent-dim); }
+.known-shell-icon { font-size: 14px; color: var(--accent); flex-shrink: 0; line-height: 1; }
+.known-shell-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.known-shell-name { font-size: 12.5px; color: var(--text); }
+.known-shell-path {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.known-shell-remove {
+  padding: 3px 7px;
+  font-size: 11px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+}
+.known-shell-remove:hover { color: var(--danger); border-color: var(--danger); box-shadow: none; }
+
+.shell-path-actions { margin-top: 8px; }
+.path-action-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; }
+.path-action-btn svg { flex-shrink: 0; }
 .checkbox-row {
   display: flex;
   align-items: center;
@@ -417,6 +457,40 @@ button.small { padding: 8px 10px; font-size: 13px; }
   border-color: var(--border);
   color: var(--muted);
 }
+.kind-choice { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.kind-choice .kc-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; }
+.kind-choice .kc-icon svg { width: 16px; height: 16px; }
+
+/* --- theme toggle (lock screen) --- */
+.theme-toggle {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--panel-solid);
+  border: 1px solid var(--border);
+  z-index: 3;
+}
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+}
+.theme-toggle-btn svg { width: 14px; height: 14px; }
+.theme-toggle-btn:hover { box-shadow: none; color: var(--text); }
+.theme-toggle-btn.active { background: var(--accent-dim); color: var(--accent); }
+
+#ambient-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
 .kind-choice.active, .slot-choice.active {
   border-color: var(--accent);
   background: rgba(53,231,255,0.15);
@@ -426,7 +500,9 @@ button.small { padding: 8px 10px; font-size: 13px; }
 .kind-choice-row .kind-choice { flex: 1 1 45%; }
 
 /* --- Seeds / Ledger tables (same shape as #entries-table) --- */
-#seeds-table, #ledger-table { width: 100%; border-collapse: collapse; }
+#seeds-table { width: 100%; border-collapse: collapse; }
+#ledger-table { width: auto; border-collapse: collapse; }
+#ledger-table td, #ledger-table th { white-space: nowrap; }
 #seeds-table th, #ledger-table th {
   text-align: left;
   padding: 10px 14px;
@@ -467,6 +543,65 @@ button.small { padding: 8px 10px; font-size: 13px; }
   z-index: 3;
 }
 #ledger-total-value { font-weight: 600; }
+
+.ledger-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin: 0 24px 24px;
+}
+.ledger-table-panel { margin: 0; flex: 0 0 auto; }
+.ledger-chart-panel {
+  flex: 1 1 auto;
+  min-width: 260px;
+  margin: 0;
+  padding: 26px 28px;
+  display: flex;
+  align-items: center;
+}
+.ledger-chart { width: 100%; display: flex; flex-direction: column; gap: 26px; }
+
+.lc-headline-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.lc-headline-value { font-family: var(--mono); font-size: 32px; font-weight: 600; }
+
+.lc-bars { display: flex; flex-direction: column; gap: 18px; }
+.lc-bar-row {
+  display: grid;
+  grid-template-columns: 96px 1fr 112px;
+  align-items: center;
+  gap: 14px;
+}
+.lc-bar-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.lc-bar-track {
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(111, 132, 148, 0.14);
+  overflow: hidden;
+}
+.lc-bar-fill { height: 100%; border-radius: 5px; transition: width 0.25s ease; }
+.lc-fill-income { background: var(--success); }
+.lc-fill-outcome { background: var(--danger); }
+.lc-bar-value {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
 
 .file-icon.zone-locked .glyph { opacity: 0.45; filter: none; }
 .file-icon.zone-locked .label { color: var(--muted); }
@@ -527,6 +662,202 @@ button.small { padding: 8px 10px; font-size: 13px; }
   color: var(--accent);
 }
 
+/* --- System zone: read-only status dashboard, no controls --- */
+.system-dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  padding: 24px;
+  position: relative;
+  z-index: 1;
+}
+.sys-section { padding: 20px 22px; border-radius: 4px; }
+.sys-section-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.sys-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(120,140,160,0.14);
+  font-size: 13px;
+}
+.sys-stat-row:last-child { border-bottom: none; }
+.sys-stat-label { color: var(--muted); }
+.sys-stat-value { font-family: var(--mono); color: var(--text); font-weight: 600; white-space: nowrap; }
+.sys-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(120,140,160,0.16);
+  overflow: hidden;
+  margin-top: 12px;
+}
+.sys-bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 4px; transition: width 0.4s ease; }
+
+.sys-zones-list { display: flex; flex-direction: column; gap: 13px; }
+.sys-zone-row { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.sys-zone-row-top { display: flex; align-items: center; gap: 9px; }
+.sys-zone-glyph { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; color: var(--accent); flex-shrink: 0; }
+.sys-zone-glyph .zone-icon-svg { width: 18px; height: 18px; filter: none; }
+.sys-zone-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.sys-zone-crypto { font-family: var(--mono); font-size: 10.5px; color: var(--muted); padding-left: 29px; }
+.sys-zone-state { font-size: 11px; padding: 2px 8px; border-radius: 3px; white-space: nowrap; flex-shrink: 0; }
+.sys-state-unlocked { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+.sys-state-locked { color: var(--muted); background: color-mix(in srgb, var(--muted) 12%, transparent); }
+
+.dot.dot-warn { background: var(--warn); box-shadow: 0 0 8px var(--warn), 0 0 2px var(--warn); }
+
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(53,231,255,0.25); border-radius: 6px; }
+
+/* ============================================================================
+   Theme: Signal — calm/premium/technological second theme.
+   Cyberpunk (the :root defaults above) stays completely untouched; every
+   rule below is scoped to [data-theme="signal"] and either overrides a CSS
+   variable (most components re-theme automatically) or a hardcoded cyan
+   value the original rules used directly instead of a variable.
+   ============================================================================ */
+
+[data-theme="signal"] {
+  --bg: #0a0908;
+  --panel: rgba(20, 17, 13, 0.66);
+  --panel-solid: #14110d;
+  --border: rgba(201, 145, 90, 0.18);
+  --border-strong: rgba(201, 145, 90, 0.5);
+  --text: #f1ece2;
+  --muted: #948a7a;
+  --accent: #c9915a;
+  --accent-dim: rgba(201, 145, 90, 0.14);
+  --accent2: #a9754a;
+  --danger: #ff5c7a;
+  --warn: #ffb545;
+  --success: #4ce0b3;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-theme="signal"] body::before, [data-theme="signal"] body::after { display: none; }
+
+[data-theme="signal"] .corner { display: none; }
+
+[data-theme="signal"] .panel {
+  border-radius: 12px;
+  backdrop-filter: blur(18px) saturate(160%);
+  box-shadow: 0 30px 70px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+[data-theme="signal"] .brand-mark { text-shadow: 0 0 16px rgba(201,145,90,0.45); }
+[data-theme="signal"] .brand-title {
+  font-family: var(--sans);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-shadow: none;
+}
+
+[data-theme="signal"] input[type="text"],
+[data-theme="signal"] input[type="password"],
+[data-theme="signal"] textarea,
+[data-theme="signal"] select {
+  background: rgba(0,0,0,0.28);
+  border-radius: 8px;
+}
+
+[data-theme="signal"] button {
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(201,145,90,0.22), rgba(201,145,90,0.06));
+  border-color: var(--accent2);
+}
+[data-theme="signal"] button:hover { box-shadow: 0 0 18px rgba(201,145,90,0.32); }
+[data-theme="signal"] button.danger {
+  background: linear-gradient(180deg, rgba(255,92,122,0.22), rgba(255,92,122,0.06));
+  border-color: var(--danger);
+}
+[data-theme="signal"] button.danger:hover { box-shadow: 0 0 18px rgba(255,92,122,0.4); }
+
+[data-theme="signal"] .hud-bar { background: rgba(20,17,13,0.75); }
+
+[data-theme="signal"] .kind-choice.active,
+[data-theme="signal"] .slot-choice.active {
+  background: rgba(201,145,90,0.16);
+}
+
+[data-theme="signal"] #entries-table th,
+[data-theme="signal"] #seeds-table th,
+[data-theme="signal"] #ledger-table th {
+  background: rgba(201,145,90,0.05);
+}
+[data-theme="signal"] #entries-table td,
+[data-theme="signal"] #seeds-table td,
+[data-theme="signal"] #ledger-table td {
+  border-bottom-color: rgba(201,145,90,0.1);
+}
+[data-theme="signal"] #entries-table tbody tr:hover,
+[data-theme="signal"] #seeds-table tbody tr:hover,
+[data-theme="signal"] #ledger-table tbody tr:hover {
+  background: rgba(201,145,90,0.06);
+}
+
+[data-theme="signal"] .ledger-total { border-radius: 8px; }
+
+[data-theme="signal"] ::-webkit-scrollbar-thumb { background: rgba(201,145,90,0.28); }
+
+/* --- zone icons: custom SVG glyphs replace emoji under Signal --- */
+[data-theme="signal"] .file-icon .glyph { filter: none; }
+[data-theme="signal"] .zone-icon-svg {
+  width: 34px;
+  height: 34px;
+  color: var(--accent);
+  filter: drop-shadow(0 0 8px rgba(201,145,90,0.45));
+  transition: filter 0.15s, transform 0.15s;
+}
+[data-theme="signal"] .file-icon:hover .zone-icon-svg {
+  filter: drop-shadow(0 0 14px rgba(201,145,90,0.7));
+  transform: scale(1.06);
+}
+[data-theme="signal"] .cd-node {
+  animation: cd-pulse 2.6s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+[data-theme="signal"] .zi-accounts .cd-node { animation-delay: 0s; }
+[data-theme="signal"] .zi-files .cd-node { animation-delay: 0.5s; }
+[data-theme="signal"] .zi-seeds .cd-node:nth-of-type(1) { animation-delay: 1s; }
+[data-theme="signal"] .zi-seeds .cd-node:nth-of-type(2) { animation-delay: 1.3s; }
+[data-theme="signal"] .zi-ledger .cd-node { animation-delay: 1.6s; }
+[data-theme="signal"] .zi-system .cd-node { animation-delay: 0.8s; }
+@keyframes cd-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.4); }
+}
+
+/* --- kind-choice icons in the "new zone" modal render at the same size --- */
+[data-theme="signal"] .kind-choice .kc-icon svg.zone-icon-svg { width: 16px; height: 16px; filter: none; }
+[data-theme="signal"] .kind-choice.active .kc-icon svg.zone-icon-svg { color: var(--accent); }
+[data-theme="signal"] .kind-choice .kc-icon svg.zone-icon-svg { color: var(--muted); }
+
+/* --- screen transitions: sequential fade-out / fade-in, driven by app.js's
+   switchScreen() helper (cyberpunk keeps the original instant cut) --- */
+[data-theme="signal"] .screen { transition: opacity 0.32s ease, transform 0.32s ease; }
+[data-theme="signal"] .screen.screen-fade-out { opacity: 0; transform: translateY(-6px) scale(0.99); }
+[data-theme="signal"] .screen.screen-fade-in-start {
+  opacity: 0 !important;
+  transform: translateY(8px);
+  transition: none !important;
+}
+
+/* Fades the lock card out of the way on a successful unlock so the
+   particle-formation flourish has the full screen to itself instead of
+   playing out hidden behind the still-opaque card. */
+[data-theme="signal"] .lock-card { transition: opacity 0.5s ease, transform 0.5s ease; }
+[data-theme="signal"] .lock-card.card-fade-out {
+  opacity: 0;
+  transform: scale(0.97);
+  pointer-events: none;
+}

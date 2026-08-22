@@ -1,0 +1,61 @@
+# cargo-deny config, scoped to supply-chain security (not license auditing).
+# Run: cargo deny check advisories bans sources
+# (licenses check intentionally not part of the security workflow — this is
+# a private offline app, not something redistributed under license terms)
+
+[graph]
+# Only the desktop targets this app actually ships for (matches the CI
+# matrix). Excludes tauri's mobile-only (Android/iOS) dependencies — e.g.
+# `reqwest` is pulled in by tauri only on those targets, never here;
+# restricting the graph keeps the check honest about what's really shipped.
+targets = [
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-gnu",
+]
+all-features = false
+no-default-features = false
+
+[advisories]
+# Defaults: vulnerabilities = deny, yanked = deny (both stay hard failures).
+# Below are unmaintained-only advisories (no actual CVE) checked 2026-08-22,
+# all transitive from tauri itself with no safe upgrade available yet —
+# re-run `cargo deny check advisories` after any `cargo update` to catch
+# anything new; don't let this list silently grow without re-checking.
+ignore = [
+    { id = "RUSTSEC-2024-0411", reason = "gtk-rs GTK3 bindings, unmaintained — transitive via tauri's Linux backend, no fix upstream" },
+    { id = "RUSTSEC-2024-0412", reason = "gtk-rs GTK3 bindings, unmaintained — transitive via tauri's Linux backend, no fix upstream" },
+    { id = "RUSTSEC-2024-0413", reason = "gtk-rs GTK3 bindings, unmaintained — transitive via tauri's Linux backend, no fix upstream" },
+    { id = "RUSTSEC-2024-0414", reason = "gtk-rs GTK3 bindings, unmaintained — transitive via tauri's Linux backend, no fix upstream" },
+    { id = "RUSTSEC-2024-0415", reason = "gtk-rs GTK3 bindings, unmaintained — transitive via tauri's Linux backend, no fix upstream" },
+    { id = "RUSTSEC-2024-0416", reason = "gtk-rs GTK3 bindings, unmaintained — transitive via tauri's Linux backend, no fix upstream" },
+    { id = "RUSTSEC-2024-0417", reason = "gtk-rs GTK3 bindings, unmaintained — transitive via tauri's Linux backend, no fix upstream" },
+    { id = "RUSTSEC-2024-0418", reason = "gtk-rs GTK3 bindings, unmaintained — transitive via tauri's Linux backend, no fix upstream" },
+    { id = "RUSTSEC-2024-0419", reason = "gtk-rs GTK3 bindings, unmaintained — transitive via tauri's Linux backend, no fix upstream" },
+    { id = "RUSTSEC-2024-0420", reason = "gtk-rs GTK3 bindings, unmaintained — transitive via tauri's Linux backend, no fix upstream" },
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error, unmaintained — compile-time-only proc macro helper, no runtime/shipped-binary impact" },
+    { id = "RUSTSEC-2025-0075", reason = "unic-char-range, unmaintained — transitive via tauri-utils/urlpattern, no safe upgrade available per the advisory itself" },
+    { id = "RUSTSEC-2025-0080", reason = "unic-common, unmaintained — transitive via tauri-utils/urlpattern, no safe upgrade available per the advisory itself" },
+    { id = "RUSTSEC-2025-0081", reason = "unic-char-property, unmaintained — transitive via tauri-utils/urlpattern, no safe upgrade available per the advisory itself" },
+    { id = "RUSTSEC-2025-0098", reason = "unic-ucd-version, unmaintained — transitive via tauri-utils/urlpattern, no safe upgrade available per the advisory itself" },
+    { id = "RUSTSEC-2025-0100", reason = "unic-ucd-ident, unmaintained — transitive via tauri-utils/urlpattern, no safe upgrade available per the advisory itself" },
+]
+
+[bans]
+multiple-versions = "warn"
+# "allow", not "deny": the one wildcard cargo-deny finds is the internal
+# workspace path dependency (src-tauri -> crates/vault-core), not a loose
+# version bound on a third-party crate — that's the real risk this check
+# guards against, and there are zero such external wildcards here.
+wildcards = "allow"
+allow-workspace = true
+
+[sources]
+# No dependency here should ever come from anywhere but crates.io — a git or
+# unknown-registry source is exactly how a supply-chain compromise would sneak
+# in, so both are hard denies rather than warnings.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

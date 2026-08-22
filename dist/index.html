@@ -4,10 +4,27 @@
 <meta charset="utf-8" />
 <title>CIPHERDEN</title>
 <link rel="stylesheet" href="style.css" />
+<script>
+  (function () {
+    var t;
+    try { t = localStorage.getItem("cipherden-theme"); } catch (e) { t = null; }
+    document.documentElement.dataset.theme = (t === "cyberpunk" || t === "signal") ? t : "signal";
+  })();
+</script>
 </head>
 <body>
 
+<canvas id="ambient-canvas"></canvas>
+
 <section id="lock-screen" class="screen">
+  <div class="theme-toggle" id="theme-toggle">
+    <button type="button" class="theme-toggle-btn" data-theme-choice="cyberpunk" title="Тема: Cyberpunk">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l8 4.5v11L12 22l-8-4.5v-11L12 2z"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>
+    </button>
+    <button type="button" class="theme-toggle-btn" data-theme-choice="signal" title="Тема: Signal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M6 8v0a8 8 0 0 0 6 8M18 8v0a8 8 0 0 1-6 8"/></svg>
+    </button>
+  </div>
   <div class="lock-card panel">
     <div class="corner tl"></div><div class="corner tr"></div>
     <div class="corner bl"></div><div class="corner br"></div>
@@ -20,10 +37,17 @@
 
     <div class="field">
       <label class="field-label" for="shell-path">Путь к оболочке</label>
-      <div class="row">
-        <input id="shell-path" type="text" placeholder="Например: /Volumes/MySSD/shell.vault" />
-        <button id="btn-shell-browse-open" type="button" class="ghost small" title="Выбрать существующий файл оболочки">📂</button>
-        <button id="btn-shell-browse-new" type="button" class="ghost small" title="Выбрать папку для новой оболочки">📁</button>
+      <div id="known-shells" class="known-shells hidden"></div>
+      <input id="shell-path" type="text" placeholder="Например: /Volumes/MySSD/shell.vault" />
+      <div class="row shell-path-actions">
+        <button id="btn-shell-browse-open" type="button" class="ghost small path-action-btn" title="Открыть существующий файл оболочки">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5c0-.9.7-1.6 1.6-1.6h4.2l1.7 2h8.9c.9 0 1.6.7 1.6 1.6v2.6"/><path d="M3 6.5v11c0 .9.7 1.6 1.6 1.6h6.6"/><circle cx="16" cy="16" r="3.4"/><path d="M18.4 18.4L21 21"/></svg>
+          Открыть файл
+        </button>
+        <button id="btn-shell-browse-new" type="button" class="ghost small path-action-btn" title="Выбрать папку для новой оболочки">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5c0-.9.7-1.6 1.6-1.6h4.2l1.7 2h8.9c.9 0 1.6.7 1.6 1.6v9.5c0 .9-.7 1.6-1.6 1.6H4.6c-.9 0-1.6-.7-1.6-1.6z"/><path d="M12 11v6M9 14h6"/></svg>
+          Новое хранилище
+        </button>
       </div>
     </div>
     <div class="field">
@@ -162,20 +186,72 @@
       <span id="ledger-status"></span>
       <div id="ledger-total" class="ledger-total">Общий итог: <span id="ledger-total-value">0,00</span></div>
     </div>
-    <div class="table-panel panel">
-      <div class="corner tl"></div><div class="corner tr"></div>
-      <div class="corner bl"></div><div class="corner br"></div>
-      <table id="ledger-table">
-        <thead>
-          <tr>
-            <th>Дата</th>
-            <th>Движение ср-в</th>
-            <th>Комментарий</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="ledger-body"></tbody>
-      </table>
+    <div class="ledger-layout">
+      <div class="table-panel panel ledger-table-panel">
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+        <table id="ledger-table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Движение ср-в</th>
+              <th>Комментарий</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ledger-body"></tbody>
+        </table>
+      </div>
+      <div class="panel ledger-chart-panel">
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+        <div class="ledger-chart" id="ledger-chart"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="system-view" class="screen hidden">
+  <header class="hud-bar">
+    <button id="btn-system-back" class="ghost small">← Рабочий стол</button>
+    <div class="hud-brand">Системная — статус безопасности</div>
+    <div class="hud-status">
+      <span class="dot" id="system-indicator-dot"></span>
+      <span id="system-indicator-label">Проверка…</span>
+    </div>
+  </header>
+
+  <div class="system-dashboard">
+    <div class="sys-section panel">
+      <div class="sys-section-title">Разделы и шифрование</div>
+      <div id="sys-zones-list" class="sys-zones-list"></div>
+    </div>
+
+    <div class="sys-section panel">
+      <div class="sys-section-title">Оболочка на диске</div>
+      <div class="sys-stat-row"><span class="sys-stat-label">Размер файла оболочки</span><span id="sys-shell-size" class="sys-stat-value">—</span></div>
+      <div class="sys-stat-row"><span class="sys-stat-label">Свободно на томе</span><span id="sys-disk-free" class="sys-stat-value">—</span></div>
+      <div class="sys-bar-track"><div id="sys-disk-bar" class="sys-bar-fill"></div></div>
+    </div>
+
+    <div class="sys-section panel">
+      <div class="sys-section-title">Процесс CIPHERDEN</div>
+      <div class="sys-stat-row"><span class="sys-stat-label">Память</span><span id="sys-ram" class="sys-stat-value">—</span></div>
+      <div class="sys-stat-row"><span class="sys-stat-label">Загрузка CPU</span><span id="sys-cpu" class="sys-stat-value">—</span></div>
+    </div>
+
+    <div class="sys-section panel">
+      <div class="sys-section-title">Попытки входа в оболочку</div>
+      <div class="sys-stat-row"><span class="sys-stat-label">Неудачных с момента запуска</span><span id="sys-attempts-total" class="sys-stat-value">—</span></div>
+      <div class="sys-stat-row"><span class="sys-stat-label">За последние 5 минут</span><span id="sys-attempts-recent" class="sys-stat-value">—</span></div>
+    </div>
+
+    <div class="sys-section panel">
+      <div class="sys-section-title">Параметры защиты</div>
+      <div class="sys-stat-row"><span class="sys-stat-label">Шифрование разделов</span><span class="sys-stat-value">AES-256-GCM</span></div>
+      <div class="sys-stat-row"><span class="sys-stat-label">Проверка пароля</span><span id="sys-kdf" class="sys-stat-value">—</span></div>
+      <div class="sys-stat-row"><span class="sys-stat-label">Авто-блокировка</span><span id="sys-autolock" class="sys-stat-value">—</span></div>
+      <div class="sys-stat-row"><span class="sys-stat-label">Сетевые соединения</span><span class="sys-stat-value amount-positive">Отсутствуют</span></div>
     </div>
   </div>
 </section>
@@ -281,10 +357,10 @@
     <div class="field">
       <label class="field-label">Тип раздела</label>
       <div class="row kind-choice-row">
-        <button type="button" id="nz-kind-accounts" class="kind-choice active" data-kind="accounts">🔑 Аккаунты</button>
-        <button type="button" id="nz-kind-files" class="kind-choice" data-kind="files">🗂 Файлы</button>
-        <button type="button" id="nz-kind-seeds" class="kind-choice" data-kind="seeds">🌱 Seed</button>
-        <button type="button" id="nz-kind-ledger" class="kind-choice" data-kind="ledger">💰 Баланс</button>
+        <button type="button" id="nz-kind-accounts" class="kind-choice active" data-kind="accounts"><span class="kc-icon">🔑</span><span class="kc-label">Аккаунты</span></button>
+        <button type="button" id="nz-kind-files" class="kind-choice" data-kind="files"><span class="kc-icon">🗂</span><span class="kc-label">Файлы</span></button>
+        <button type="button" id="nz-kind-seeds" class="kind-choice" data-kind="seeds"><span class="kc-icon">🌱</span><span class="kc-label">Seed</span></button>
+        <button type="button" id="nz-kind-ledger" class="kind-choice" data-kind="ledger"><span class="kc-icon">💰</span><span class="kc-label">Баланс</span></button>
       </div>
     </div>
     <div class="field"><label class="field-label">Название раздела</label><input id="nz-label" type="text" placeholder="Например: Личные аккаунты" /></div>
