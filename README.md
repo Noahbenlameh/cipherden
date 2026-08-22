@@ -28,7 +28,9 @@ past it:
 
 - [x] `vault-core`: Argon2id KDF + SQLCipher/AES-256-GCM-backed storage
       core (create/open/CRUD/search/backup), zero UI dependencies, fully
-      tested (71 tests).
+      tested (74 tests). Sidecar key/metadata files write atomically
+      (temp file + fsync + rename), so an interrupted write (e.g. the
+      drive is yanked mid-save) can't corrupt them.
 - [x] **Shell + zones architecture**: one encrypted Shell file on disk,
       holding independent, separately-password-protected zones —
       **Accounts**, **Files**, **Seeds**, **Ledger/"Баланс"** — reached
@@ -51,6 +53,13 @@ past it:
       plus a supply-chain-security job (`cargo-audit` + `cargo-deny`).
 - [x] Portable binary — verified to run standalone from any directory with
       no files alongside it (frontend is embedded in the binary).
+- [x] **Real cross-platform portable builds** for macOS, Windows, and
+      Linux (a GitHub Actions release pipeline, since Tauri needs a
+      native build per OS), deployed together on one ExFAT SSD — no
+      installer, no admin rights, nothing installed on the host machine.
+- [x] An emergency quick-exit (button + Ctrl+Shift+X): instantly clears
+      all in-memory session/key material and quits, no confirmation, for
+      the moment the drive needs to come out right now.
 
 SSH/Tailscale launcher, hidden-volume/duress protection, and hardware 2FA
 (YubiKey) remain explicitly parked/deferred — see `THREAT_MODEL.md` and
