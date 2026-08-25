@@ -13,6 +13,10 @@ src-tauri/gen/
 /vault/
 .DS_Store
 .claude/
+
+# Internal working docs — not for the public repo (kept on disk locally).
+/PROJECT_MAP.md
+/TZ_SecureVault.md
 # Screen recordings dropped in the repo root for review (e.g. animation
 # QA) — never project source, never meant to be committed.
 *.mov
